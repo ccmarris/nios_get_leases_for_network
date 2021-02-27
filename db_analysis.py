@@ -13,7 +13,9 @@
  Date Last Updated: 20210227
 
  Changelog:
+ - 0.1.0: Created new definitions to allow support for more objects and moved logfile to a CSV file
  - 0.2.0: Added support for /32 networks
+ - 0.2.1: Test with lxml as XML parser for increased speed and performance
 
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -43,13 +45,13 @@
 
 ------------------------------------------------------------------------
 '''
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 __author__ = 'John Neerdael'
 __author_email__ = 'jneerdael@infoblox.com'
 
-
-import xml.etree.ElementTree as ET
+#import xml.etree.ElementTree as ET
 import argparse, tarfile, logging, re, time, sys, tqdm
+import lxml.etree as ET
 
 # Parse arguments
 parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility',
