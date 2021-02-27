@@ -6,11 +6,14 @@
    Python script to search for feature gaps between NIOS and BloxOne DDI
 
  Requirements:
-   Python3 with re
+   Python3 with xml.etree.ElementTree, argparse, tarfile, logging, re, time, sys, tqdm
 
  Author: John Neerdael
 
  Date Last Updated: 20210227
+
+ Changelog:
+ - 0.2.0: Added support for /32 networks
 
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -40,7 +43,7 @@
 
 ------------------------------------------------------------------------
 '''
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 __author__ = 'John Neerdael'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -95,10 +98,22 @@ def processdhcpoption(xmlobject):
     hexvalue, optionvalue = validatehex(value)
     return type, parentobj, optionspace, optioncode, hexvalue, optionvalue
 
+def processnetwork(xmlobject):
+    cidr = address = ''
+    for property in xmlobject:
+        if property.attrib['NAME'] == 'cidr':
+            cidr = property.attrib['VALUE']
+        elif property.attrib['NAME'] == 'address':
+            address = property.attrib['VALUE']
+    return address, cidr
+
 def validateobject(xmlobject):
     for property in xmlobject:
         if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':
             object = 'dhcpoption'
+            return object
+        elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.network':
+            object = 'dhcpnetwork'
             return object
         elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] != '.com.infoblox.dns.option':
             object = ''
@@ -152,6 +167,12 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     else:
         None
 
+def validatenetwork(address, cidr):
+    if cidr == '32':
+        logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr)
+    else:
+        None
+
 def searchrootobjects(roottree, iterations):
     with tqdm.tqdm(total=iterations) as pbar:
         for elem in roottree.iter('OBJECT'):
@@ -161,6 +182,9 @@ def searchrootobjects(roottree, iterations):
                 if object == 'dhcpoption':
                     type, parentobj, optionspace, optioncode, hexvalue, optionvalue = processdhcpoption(elem)
                     validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue)
+                elif object == 'dhcpnetwork':
+                    address, cidr = processnetwork(elem)
+                    validatenetwork(address, cidr)
                 else:
                     None
             except:
@@ -168,6 +192,7 @@ def searchrootobjects(roottree, iterations):
 
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
+    logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT')
 
 def main():
     tree = ET.parse(xmlfile)
