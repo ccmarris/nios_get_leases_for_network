@@ -17,6 +17,8 @@
  - 0.2.0: Added support for /32 networks
  - 0.2.1: Test with lxml as XML parser for increased speed and performance
  - 0.2.2: Clean-up old code snippets
+ - 0.2.3: Added demo code for using iterparse instead of parse (stream vs load database to memory)
+ - 0.3.0: Forked to seperate version for testing iterparse
 
  ToDo:
  - Move code to use a iterparse loop for increased efficiency and memory usage and test speed on big databases
@@ -61,11 +63,12 @@ import lxml.etree as ET
 parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility',
                                  prog='xml_analysis')
 parser.add_argument('-v', '--version', action='version', version='%(prog)s 0.1')
-parser.add_argument('-d', '--database', action="store", help="Path to database file", required=True)
+#parser.add_argument('-d', '--database', action="store", help="Path to database file", required=True)
 parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
 options = parser.parse_args()
 
 t = time.perf_counter()
+database = 'okq8.bak'
 
 # log events to the log file and to stdout
 dateTime=time.strftime("%H%M%S-%d%m%Y")
@@ -87,7 +90,8 @@ logging.basicConfig(
 )
 
 print('EXTRACTING DATABASE FROM BACKUP')
-tar = tarfile.open(options.database, "r:gz")
+tar = tarfile.open(database, "r:gz")
+#tar = tarfile.open(options.database, "r:gz")
 xmlfile = tar.extractfile('onedb.xml')
 
 def rawincount(filename):
@@ -96,7 +100,7 @@ def rawincount(filename):
 
 def processdhcpoption(xmlobject):
     parent = optiondef = value = ''
-    for property in xmlobject:
+    for property in (xmlobject.iter()):
         if property.attrib['NAME'] == 'parent':
             parent = property.attrib['VALUE']
         elif property.attrib['NAME'] == 'option_definition':
@@ -118,7 +122,17 @@ def processnetwork(xmlobject):
     return address, cidr
 
 def validateobject(xmlobject):
-    for property in xmlobject:
+    for property in xmlobject.iter():
+        if property:
+            print(test)
+        #for child in property:
+            #test = child.get('NAME')
+            #print(child.tag, child.attrib)
+            #attributes = getattr(child)
+            #print(attributes)
+'''
+        if object.attrib['NAME'] == '__type') and property.attrib['VALUE'] == '.com.infoblox.dns.option':
+                print(dhcptoption)
         if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':
             object = 'dhcpoption'
             return object
@@ -128,6 +142,7 @@ def validateobject(xmlobject):
         elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] != '.com.infoblox.dns.option':
             object = ''
             return object
+'''
 
 def checkparentobject(parent):
     objects = re.search(r"(.*)\$(.*)", parent)
@@ -183,38 +198,44 @@ def validatenetwork(address, cidr):
     else:
         None
 
-def searchrootobjects(roottree, iterations):
+def searchrootobjects(xmlfile, iterations):
     with tqdm.tqdm(total=iterations) as pbar:
-        for elem in roottree.iter('OBJECT'):
-            pbar.update(1)
-            try:
-                object = validateobject(elem)
-                if object == 'dhcpoption':
-                    type, parentobj, optionspace, optioncode, hexvalue, optionvalue = processdhcpoption(elem)
-                    validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue)
-                elif object == 'dhcpnetwork':
-                    address, cidr = processnetwork(elem)
-                    validatenetwork(address, cidr)
-                else:
-                    None
-            except:
-                None
+        count = 0
+        xmlfile.seek(0)
+        for event, elem in ET.iterparse(xmlfile):
+            if event == 'end':
+                if elem.tag == 'OBJECT':
+                    count += 1
+                    pbar.update(1)
+                    validateobject(elem)
+            elem.clear()
 
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
     logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT')
 
 def main():
-    tree = ET.parse(xmlfile)
-    root = tree.getroot()
     t2 = time.perf_counter() - t
     print(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
+    iterations = rawincount(xmlfile)
+    xmlfile.seek(0)
+    t3 = time.perf_counter() - t2
+    print(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
     writeheaders()
-    iterations = len(list(root))
-    searchrootobjects(root, iterations)
-    t2 = time.perf_counter() - t
-    print(f'FINISHED PROCESSING IN {t2:0.2f}S, LOGFILE: {logfile}')
+    searchrootobjects(xmlfile, iterations)
+    t4 = time.perf_counter() - t
+    print(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
     return
+'''
+    count = 0
+    xmlfile.seek(0)
+    for event, elem in ET.iterparse(xmlfile):
+        if event == 'end':
+            if elem.tag == 'OBJECT':
+                count += 1
+        elem.clear()
+    print(count)
+'''
 
 if __name__ == '__main__':
     main()
