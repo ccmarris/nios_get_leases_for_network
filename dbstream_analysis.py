@@ -6,8 +6,7 @@
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
  Author: John Neerdael
- Date Last Updated: 20210305
-
+ Date Last Updated: 20210227
  Changelog:
  - 0.1.0: Created new definitions to allow support for more objects and moved logfile to a CSV file
  - 0.2.0: Added support for /32 networks
@@ -15,12 +14,9 @@
  - 0.2.2: Clean-up old code snippets
  - 0.2.3: Added demo code for using iterparse instead of parse (stream vs load database to memory)
  - 0.3.0: Forked to seperate version for testing iterparse
- - 0.3.1: First production iterparse version, added support for networkcontainers, merged fork from Chris, added support for --debug flag
 
  ToDo:
- - Add support for lease object counting
- - Add support for ini file (Chris)
- - Add support for DDNS domain analysis
+ - Move code to use a iterparse loop for increased efficiency and memory usage and test speed on big databases
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -45,7 +41,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.1'
+__version__ = '0.2.6'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
