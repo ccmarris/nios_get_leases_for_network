@@ -6,7 +6,7 @@
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
  Author: John Neerdael
- Date Last Updated: 20210227
+ Date Last Updated: 20210305
  Changelog:
  - 0.1.0: Created new definitions to allow support for more objects and moved logfile to a CSV file
  - 0.2.0: Added support for /32 networks
@@ -15,6 +15,7 @@
  - 0.2.3: Added demo code for using iterparse instead of parse (stream vs load database to memory)
  - 0.3.0: Forked to seperate version for testing iterparse
  - 0.3.1: Merged fork from Chris, added debug flag, added networkcontainer support, optimized for loop with break
+ - 0.3.2: Minor update (sanitized checkparentobject)
 
  ToDo:
  - Add support for lease counting per member
@@ -111,8 +112,7 @@ def validateobject(xmlobject):
 
 def checkparentobject(parent):
     objects = re.search(r"(.*)\$(.*)", parent)
-    type = ''
-    parentobj = ''
+    type = parentobj = ''
     if objects.group(1) == '.com.infoblox.dns.network':
         type = 'NETWORK'
         parentobj = re.sub(r'\/0$', '', objects.group(2))
