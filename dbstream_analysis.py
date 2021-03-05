@@ -14,9 +14,12 @@
  - 0.2.2: Clean-up old code snippets
  - 0.2.3: Added demo code for using iterparse instead of parse (stream vs load database to memory)
  - 0.3.0: Forked to seperate version for testing iterparse
+ - 0.3.1: Merged fork from Chris, added debug flag, added networkcontainer support, optimized for loop with break
 
  ToDo:
- - Move code to use a iterparse loop for increased efficiency and memory usage and test speed on big databases
+ - Add support for lease counting per member
+ - Add support for DDNS domain config
+ - Add support for ini file
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
