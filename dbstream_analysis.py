@@ -51,7 +51,7 @@
 
 ------------------------------------------------------------------------
 '''
-__version__ = '0.2.5'
+__version__ = '0.2.6'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -155,16 +155,17 @@ def validatehex(values):
 
 def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue):
     incompatible_options = [ 12, 124, 125, 146, 159, 212 ]
-    validate_options = [ 43 ]
+    validate_options = [ 43, 151 ]
     if optioncode in incompatible_options:
         logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
     elif optioncode in validate_options:
-        if hexvalue == True:
+        if optioncode == 151:
             logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
-        elif hexvalue == False:
-            logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
-    elif optioncode == 151:
-        logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
+        elif optioncode == 43:
+            if hexvalue == True:
+                logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
+            elif hexvalue == False:
+                logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
     else:
         None
 
@@ -197,8 +198,7 @@ def searchrootobjects(xmlfile, iterations):
                         None
                 except:
                     None
-
-            pbar.update(1)
+                pbar.update(1)
             elem.clear()
     return
 
