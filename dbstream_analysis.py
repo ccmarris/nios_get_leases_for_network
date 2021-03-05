@@ -51,7 +51,7 @@
 
 ------------------------------------------------------------------------
 '''
-__version__ = '0.2.2'
+__version__ = '0.2.5'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -77,7 +77,7 @@ def rawincount(filename):
 
 def processdhcpoption(xmlobject):
     parent = optiondef = value = ''
-    for property in (xmlobject.iter()):
+    for property in xmlobject:
         if property.attrib['NAME'] == 'parent':
             parent = property.attrib['VALUE']
         elif property.attrib['NAME'] == 'option_definition':
@@ -101,27 +101,19 @@ def processnetwork(xmlobject):
 
 
 def validateobject(xmlobject):
-    for property in xmlobject.iter():
-        if property:
-            print(etree.tostring(property))
-        #for child in property:
-            #test = child.get('NAME')
-            #print(child.tag, child.attrib)
-            #attributes = getattr(child)
-            #print(attributes)
-'''
-        if object.attrib['NAME'] == '__type') and property.attrib['VALUE'] == '.com.infoblox.dns.option':
-                print(dhcptoption)
+    object = ''
+    for property in xmlobject:
         if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':
             object = 'dhcpoption'
-            return object
+            log.debug("Type = {}, Attirb = {}".format(object, property.attrib))
         elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.network':
             object = 'dhcpnetwork'
-            return object
+            log.debug("Type = {}, Attirb = {}".format(object, property.attrib))
         elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] != '.com.infoblox.dns.option':
             object = ''
-            return object
-'''
+
+    return object
+
 
 def checkparentobject(parent):
     objects = re.search(r"(.*)\$(.*)", parent)
@@ -163,10 +155,10 @@ def validatehex(values):
 
 def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue):
     incompatible_options = [ 12, 124, 125, 146, 159, 212 ]
-    validate_options = [ 43, 151 ]
-    if (optioncode == 12 or optioncode == 124 or optioncode == 125 or optioncode == 146 or optioncode == 159 or optioncode == 212):
+    validate_options = [ 43 ]
+    if optioncode in incompatible_options:
         logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
-    elif optioncode == 43:
+    elif optioncode in validate_options:
         if hexvalue == True:
             logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue)
         elif hexvalue == False:
@@ -189,19 +181,32 @@ def searchrootobjects(xmlfile, iterations):
     with tqdm.tqdm(total=iterations) as pbar:
         count = 0
         #xmlfile.seek(0)
-        for event, elem in etree.iterparse(xmlfile):
-            if event == 'start':
-                if elem.tag == 'OBJECT':
-                    print(etree.tostring(elem))
-                    count += 1
-                    pbar.update(1)
-                    validateobject(etree.ElementTree(elem))
+        context = etree.iterparse(xmlfile, events=('start','end'))
+        for event, elem in context:
+            if event == 'start' and elem.tag == 'OBJECT':
+                count += 1
+                try:
+                    object = validateobject(elem)
+                    if object == 'dhcpoption':
+                        type, parentobj, optionspace, optioncode, hexvalue, optionvalue = processdhcpoption(elem)
+                        validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue)
+                    elif object == 'dhcpnetwork':
+                        address, cidr = processnetwork(elem)
+                        validatenetwork(address, cidr)
+                    else:
+                        None
+                except:
+                    None
+
+            pbar.update(1)
             elem.clear()
+    return
 
 
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
     logging.info('HEADER-DHCPNetreeWORK,STATUS,OBJECT')
+    return
 
 
 def main():
