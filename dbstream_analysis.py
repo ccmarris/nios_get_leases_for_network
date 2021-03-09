@@ -16,6 +16,7 @@
  - 0.3.0: Forked to seperate version for testing iterparse
  - 0.3.1: Merged fork from Chris, added debug flag, added networkcontainer support, optimized for loop with break
  - 0.3.2: Minor update (sanitized checkparentobject)
+ - 0.3.3: Add dhcp lease counting
 
  ToDo:
  - Add support for lease counting per member
@@ -45,11 +46,12 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
 import argparse, tarfile, logging, re, time, sys, tqdm
+import collections
 from itertools import (takewhile,repeat)
 from lxml import etree
 
@@ -103,6 +105,9 @@ def validateobject(xmlobject):
             break
         elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.network':
             object = 'dhcpnetwork'
+            break
+        elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.lease':
+            object = 'dhcplease'
             break
         elif property.attrib['NAME'] == '__type':
             object = ''
@@ -174,9 +179,24 @@ def validatenetwork(address, cidr, count):
     else:
         None
 
+def dhcplease_node(xmlobject):
+    '''
+    Determine Lease State
+    '''
+    member = ''
+    for property in xmlobject:
+        count = False
+        if property.attrib['NAME'] == 'node_id':
+            node = property.attrib['VALUE']
+        if property.attrib['NAME'] == 'binding_state' and property.attrib['VALUE'] == 'active':
+            member = node
+
+    return member
+
 
 def searchrootobjects(xmlfile, iterations):
     # parser = etree.XMLPullParser(target=AttributeFilter())
+    node_lease_count = collections.Counter()
     with tqdm.tqdm(total=iterations) as pbar:
         count = 0
         #xmlfile.seek(0)
@@ -192,12 +212,21 @@ def searchrootobjects(xmlfile, iterations):
                     elif object == 'dhcpnetwork':
                         address, cidr = processnetwork(elem)
                         validatenetwork(address, cidr, count)
+                    elif object == 'dhcplease':
+                        node = dhcplease_node(elem)
+                        if node:
+                            node_lease_count[node] += 1
                     else:
                         None
                 except:
                     None
                 pbar.update(1)
             elem.clear()
+
+        # Log lease info
+        for key in node_lease_count:
+            logging.info('DHCP Member: {}, Count: {}'.format(key, node_lease_count[key]))
+
     return
 
 
