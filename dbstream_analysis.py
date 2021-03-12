@@ -225,7 +225,7 @@ def searchrootobjects(xmlfile, iterations):
 
         # Log lease info
         for key in node_lease_count:
-            logging.info('DHCP Member: {}, Count: {}'.format(key, node_lease_count[key]))
+            logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
 
     return
 
@@ -233,6 +233,7 @@ def searchrootobjects(xmlfile, iterations):
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
     logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE')
+    logging.info('HEADER-LEASECOUNT,MEMBER,ACTIVELEASES')
     return
 
 
