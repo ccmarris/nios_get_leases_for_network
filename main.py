@@ -8,7 +8,7 @@
 
  Author: John Neerdael
 
- Date Last Updated: 20210305
+ Date Last Updated: 20210330
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.3'
+__version__ = '0.4.1'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -56,58 +56,23 @@ def parseargs():
     return parser.parse_args()
 
 
-def searchrootobjects(xmlfile, iterations):
-    # parser = etree.XMLPullParser(target=AttributeFilter())
-    node_lease_count = collections.Counter()
-    with tqdm.tqdm(total=iterations) as pbar:
-        count = 0
-        #xmlfile.seek(0)
-        context = etree.iterparse(xmlfile, events=('start','end'))
-        for event, elem in context:
-            if event == 'start' and elem.tag == 'OBJECT':
-                count += 1
-                try:
-                    object = validateobject(elem)
-                    if object == 'dhcpoption':
-                        type, parentobj, optionspace, optioncode, hexvalue, optionvalue = processdhcpoption(elem)
-                        validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count)
-                    elif object == 'dhcpnetwork':
-                        address, cidr = processnetwork(elem)
-                        validatenetwork(address, cidr, count)
-                    elif object == 'dhcplease':
-                        node = dhcplease_node(elem)
-                        if node:
-                            node_lease_count[node] += 1
-                    else:
-                        None
-                except:
-                    None
-                pbar.update(1)
-            elem.clear()
-
-        # Log lease info
-        for key in node_lease_count:
-            logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
-
-    return
-
-
 def process_onedb(xmlfile, iterations):
     '''
     Process onedb.xml
     '''
     # parser = etree.XMLPullParser(target=AttributeFilter())
-    report = collections.defaultdict(list)
+    report = {}
     object_counts = collections.Counter()
     member_counts = collections.Counter()
     feature_enabled = collections.defaultdict(bool)
 
+    report['processed'] = collections.defaultdict(list)
     report['counts'] = object_counts
     report['features'] = feature_enabled
     report['member_counts'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
 
-    OBJECTS = dbobjects.DBOBJECTS()
+    OBJECTS = dbobjects.DBCONFIG()
     with tqdm.tqdm(total=iterations) as pbar:
         count = 0
         #xmlfile.seek(0)
@@ -130,14 +95,14 @@ def process_onedb(xmlfile, iterations):
                                 # onsider using a pandas dataframe
                                 response = process_object(elem, count)
                                 if response:
-                                    report[obj_value].append(response)
+                                    report['processed'][obj_value].append(response)
                             elif action == 'member':
                                 process_object = getattr(dbobjects, OBJECTS.func(obj_value))
                                 if obj_type not in report['member_counts'].keys():
-                                    report['member_counts'][obj_type] = collections.Counter()
+                                    report['member_counts'][obj_value] = collections.Counter()
                                 member = process_object(elem)
                                 if member:
-                                    report['member_counts'][obj_type][member] += 1
+                                    report['member_counts'][obj_value][member] += 1
                             else:
                                 logging.warning('Action: {} not implemented'.format(action))
                                 None
@@ -166,6 +131,24 @@ def output_reports(report):
     Generate and output reports
     '''
     pprint.pprint(report)
+    CONFIG = dbobjects.DBCONFIG()
+
+    for section in CONFIG.reports():
+        if section in report.keys():
+            pprint.pprint(section)
+        else:
+            log.error('Report {} not implemented'.format(section))
+            print('Report {} not implemented'.format(section))
+
+
+    '''
+    logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+    logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+    logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+    logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+    logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
+    logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
+    '''
 
     return
 
@@ -218,6 +201,7 @@ def main():
 
         print(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
         writeheaders()
+
         # searchrootobjects(xmlfile, iterations)
         db_report = process_onedb(xmlfile, iterations)
         output_reports(db_report)
