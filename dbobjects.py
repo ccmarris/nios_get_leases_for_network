@@ -1,19 +1,23 @@
+
 #!/usr/local/bin/python3
 '''
 ------------------------------------------------------------------------
  Description:
    Python script to search for feature gaps between NIOS and BloxOne DDI
+
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
 
- Author: John Neerdael
+ Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210305
-
+ Date Last Updated: 20210321
+ 
  Copyright (c) 2021 John Neerdael / Infoblox
+
  Redistribution and use in source and binary forms,
  with or without modification, are permitted provided
  that the following conditions are met:
+
  1. Redistributions of source code must retain the above copyright
  notice, this list of conditions and the following disclaimer.
  2. Redistributions in binary form must reproduce the above copyright
@@ -33,34 +37,142 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.3'
-__author__ = 'John Neerdael, Chris Marrison'
-__author_email__ = 'jneerdael@infoblox.com'
+__version__ = '0.4.0'
+__author__ = 'Chris Marrison, John Neerdael'
+__author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
-import dbobjects
-import argparse, tarfile, logging, re, time, sys, tqdm
+import tarfile, logging, re, time, sys, tqdm
+import os
 import collections
-from itertools import (takewhile,repeat)
+import yaml
 from lxml import etree
+from itertools import (takewhile,repeat)
 
 
-def parseargs():
-    # Parse arguments
-    parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility')
-    parser.add_argument('-d', '--database', action="store", help="Path to database file", required=True)
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s '+ __version__)
-    parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
-    parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
+class DBOBJECTS():
+    '''
+    Define Class for onedb.xml db objects
+    '''
 
-    return parser.parse_args()
+    def __init__(self, cfg_file='objects.yaml'):
+        '''
+        Initialise Class Using YAML config
+        '''
+        self.dbobjects = {}
+   
+        # Check for inifile and raise exception if not found
+        if os.path.isfile(cfg_file):
+            # Attempt to read api_key from ini file
+            try:
+
+                self.dbobjects = yaml.safe_load(open(cfg_file, 'r'))
+            except yaml.YAMLError as err:
+                logging.error(err)
+                raise
+        else:
+            logging.error('No such file {}'.format(cfg_file))
+            raise FileNotFoundError('YAML object file "{}" not found.'.format(cfg_file))
+
+        return
 
 
-def rawincount(filename):
-    bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
-    return sum( buf.count(b'\n') for buf in bufgen )
+    def keys(self):
+        return self.dbobjects['objects'].keys()
 
 
-def processdhcpoption(xmlobject):
+    def count(self):
+        return len(self.dbobjects['objects'])  
+
+
+    def included(self, dbobj):
+        '''
+        Check whether this dbobj is configured
+        '''
+        status = False
+        if dbobj in self.keys():
+            status = True
+        else:
+            status = False
+
+        return status
+
+
+    def obj_type(self, dbobj):
+        '''
+        Return simple name of object
+        '''
+        t = None
+        if self.included(dbobj):
+            t = self.dbobjects['objects'][dbobj]['type']
+        else:
+            t = None
+        
+        return t
+
+
+    def header(self, dbobj):
+        '''
+        Return name of function for dbobj
+        '''
+        if self.included(dbobj):
+            if 'header' in self.dbobjects['objects'][dbobj]:
+                header = self.dbobjects['objects'][dbobj]['header']
+            else:
+                header = ''
+        else:
+            header = ''
+            # Consider raising KeyError Exception
+
+        return header
+
+
+    def actions(self, dbobj):
+        '''
+        Get list of actions for dbobj
+        '''
+        actions = []
+        if self.included(dbobj):
+            actions = self.dbobjects['objects'][dbobj]['actions']
+        else:
+            actions = []
+        
+        return actions
+    
+
+    def func(self, dbobj):
+        '''
+        Return name of function for dbobj
+        '''
+        if self.included(dbobj):
+            if 'func' in self.dbobjects['objects'][dbobj]:
+                function = self.dbobjects['objects'][dbobj]['func']
+            else:
+                function = None
+        else:
+            function = None
+            # Consider raising KeyError Exception
+
+        return function
+
+
+    def reports(self, dbobj):
+        '''
+        Return list of reports for dbobj
+        '''
+        reports = []
+        if self.included(dbobj):
+            reports = self.dbobjects['objects'][dbobj]['reports']
+        else:
+            reports = []
+        
+        return actions
+   
+            
+
+
+# *** Functions ***
+
+def processdhcpoption(xmlobject, count):
     parent = optiondef = value = ''
     for property in xmlobject:
         if property.attrib['NAME'] == 'parent':
@@ -72,24 +184,40 @@ def processdhcpoption(xmlobject):
     type, parentobj = checkparentobject(parent)
     optionspace, optioncode = checkdhcpoption(optiondef)
     hexvalue, optionvalue = validatehex(value)
-    return type, parentobj, optionspace, optioncode, hexvalue, optionvalue
+
+    report = validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count)
+    if len(report) == 1 and report[0] == '':
+        report = None
+
+    return report
 
 
-def processnetwork(xmlobject):
+def process_network(xmlobject, count):
     cidr = address = ''
     for property in xmlobject:
         if property.attrib['NAME'] == 'cidr':
             cidr = property.attrib['VALUE']
         elif property.attrib['NAME'] == 'address':
             address = property.attrib['VALUE']
-    return address, cidr
+    report = validatenetwork(address, cidr, count)
+    if len(report) == 1 and report[0] == '':
+        report = None
+    return report
+
+
+def process_leases(xmlobject, count):
+    return
+
+
+def rawincount(filename):
+    bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
+    return sum( buf.count(b'\n') for buf in bufgen )
 
 
 def validateobject(xmlobject):
     '''
     Validate object type
     '''
-  
     object = ''
     for property in xmlobject:
         if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':
@@ -106,30 +234,50 @@ def validateobject(xmlobject):
             break
     return object
 
+def get_object_value(xmlobject):
+    '''
+    Return the object value
+    '''
+    obj = ''
+    for property in xmlobject:
+        if property.attrib['NAME'] == '__type':
+            obj = property.attrib['VALUE']
+            break
+    
+    return str(obj)
 
 def checkparentobject(parent):
     objects = re.search(r"(.*)\$(.*)", parent)
     type = parentobj = ''
-    if objects.group(1) == '.com.infoblox.dns.network':
-        type = 'NETWORK'
-        parentobj = re.sub(r'\/0$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.fixed_address':
-        type = 'FIXEDADDRESS'
-        parentobj = re.sub(r'\.0\.\.$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.dhcp_range':
-        type = 'DHCPRANGE'
-        parentobj = re.sub(r'\/\/\/0\/$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.network_container':
-        type = 'NETWORKCONTAINER'
-        parentobj = re.sub(r'\/0$', '', objects.group(2))
+    if objects:
+        if objects.group(1) == '.com.infoblox.dns.network':
+            type = 'NETWORK'
+            parentobj = re.sub(r'\/0$', '', objects.group(2))
+        elif objects.group(1) == '.com.infoblox.dns.fixed_address':
+            type = 'FIXEDADDRESS'
+            parentobj = re.sub(r'\.0\.\.$', '', objects.group(2))
+        elif objects.group(1) == '.com.infoblox.dns.dhcp_range':
+            type = 'DHCPRANGE'
+            parentobj = re.sub(r'\/\/\/0\/$', '', objects.group(2))
+        elif objects.group(1) == '.com.infoblox.dns.network_container':
+            type = 'NETWORKCONTAINER'
+            parentobj = re.sub(r'\/0$', '', objects.group(2))
+    else:
+        type = ''
+        parentobj = ''
 
     return type, parentobj
 
 
 def checkdhcpoption(dhcpoption):
     optioncodes = re.search(r"^(.*)\.\.(true|false)\.(\d+)$", dhcpoption)
-    optionspace = optioncodes.group(1)
-    optioncode = int(optioncodes.group(3))
+    if optioncodes:
+        optionspace = optioncodes.group(1)
+        optioncode = int(optioncodes.group(3))
+    else:
+        optionspace = None
+        optioncode = None
+
     return optionspace, optioncode
 
 
@@ -153,25 +301,36 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     validate_options = [ 43, 151 ]
     if optioncode in incompatible_options:
         logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+        r = 'DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
     elif optioncode in validate_options:
         if optioncode == 151:
             logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+            r = 'DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
         elif optioncode == 43:
             if hexvalue == True:
                 logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+                r = 'DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
             elif hexvalue == False:
                 logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+                r = 'DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
     else:
-        None
+        r = ''
+    
+    validation = [ r ]
+    
+    return validation
 
 
 def validatenetwork(address, cidr, count):
     if cidr == '32':
         logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
+        report = 'DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count)
     else:
-        None
+        report = ''
+    
+    return [ report ]
 
-def dhcplease_node(xmlobject):
+def member_leases(xmlobject):
     '''
     Determine Lease State
     '''
@@ -228,53 +387,6 @@ def writeheaders():
     logging.info('HEADER-LEASECOUNT,MEMBER,ACTIVELEASES')
     return
 
-
-def main():
-    '''
-    Core logic
-    '''
-    logfile = ''
-    options = parseargs()
-    t = time.perf_counter()
-    database = options.database
-
-    # Set up logging
-    # log events to the log file and to stdout
-    dateTime=time.strftime("%H%M%S-%d%m%Y")
-    if options.customer != '':
-        logfile = f'{options.customer}-{dateTime}.csv'
-    else:
-        logfile = f'{dateTime}.csv'
-    file_handler = logging.FileHandler(filename=logfile)
-    stdout_handler = logging.StreamHandler(sys.stdout)
-    # Output to CLI and config
-    handlers = [file_handler, stdout_handler]
-    # Output to config only
-    filehandler = [file_handler]
-    logging.basicConfig(
-        level=options.loglevel,
-        format='%(message)s',
-        handlers=filehandler
-    )
-
-    # Extract db from backup
-    print('EXTRACTING DATABASE FROM BACKUP')
-
-    with tarfile.open(database, "r:gz") as tar:
-        xmlfile = tar.extractfile('onedb.xml')
-        t2 = time.perf_counter() - t
-        print(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
-
-        iterations = rawincount(xmlfile)
-        xmlfile.seek(0)
-        t3 = time.perf_counter() - t2
-        print(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
-        writeheaders()
-        searchrootobjects(xmlfile, iterations)
-        t4 = time.perf_counter() - t
-        print(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
-
-    return
 
 if __name__ == '__main__':
     main()
