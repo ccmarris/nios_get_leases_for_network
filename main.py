@@ -40,6 +40,7 @@ __author_email__ = 'jneerdael@infoblox.com'
 import dbobjects
 import argparse, tarfile, logging, re, time, sys, tqdm
 import collections
+import pprint
 from itertools import (takewhile,repeat)
 from lxml import etree
 
@@ -53,137 +54,6 @@ def parseargs():
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
     return parser.parse_args()
-
-
-def rawincount(filename):
-    bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
-    return sum( buf.count(b'\n') for buf in bufgen )
-
-
-def processdhcpoption(xmlobject):
-    parent = optiondef = value = ''
-    for property in xmlobject:
-        if property.attrib['NAME'] == 'parent':
-            parent = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'option_definition':
-            optiondef = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'value':
-            value = property.attrib['VALUE']
-    type, parentobj = checkparentobject(parent)
-    optionspace, optioncode = checkdhcpoption(optiondef)
-    hexvalue, optionvalue = validatehex(value)
-    return type, parentobj, optionspace, optioncode, hexvalue, optionvalue
-
-
-def processnetwork(xmlobject):
-    cidr = address = ''
-    for property in xmlobject:
-        if property.attrib['NAME'] == 'cidr':
-            cidr = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'address':
-            address = property.attrib['VALUE']
-    return address, cidr
-
-
-def validateobject(xmlobject):
-    '''
-    Validate object type
-    '''
-  
-    object = ''
-    for property in xmlobject:
-        if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':
-            object = 'dhcpoption'
-            break
-        elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.network':
-            object = 'dhcpnetwork'
-            break
-        elif property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.lease':
-            object = 'dhcplease'
-            break
-        elif property.attrib['NAME'] == '__type':
-            object = ''
-            break
-    return object
-
-
-def checkparentobject(parent):
-    objects = re.search(r"(.*)\$(.*)", parent)
-    type = parentobj = ''
-    if objects.group(1) == '.com.infoblox.dns.network':
-        type = 'NETWORK'
-        parentobj = re.sub(r'\/0$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.fixed_address':
-        type = 'FIXEDADDRESS'
-        parentobj = re.sub(r'\.0\.\.$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.dhcp_range':
-        type = 'DHCPRANGE'
-        parentobj = re.sub(r'\/\/\/0\/$', '', objects.group(2))
-    elif objects.group(1) == '.com.infoblox.dns.network_container':
-        type = 'NETWORKCONTAINER'
-        parentobj = re.sub(r'\/0$', '', objects.group(2))
-
-    return type, parentobj
-
-
-def checkdhcpoption(dhcpoption):
-    optioncodes = re.search(r"^(.*)\.\.(true|false)\.(\d+)$", dhcpoption)
-    optionspace = optioncodes.group(1)
-    optioncode = int(optioncodes.group(3))
-    return optionspace, optioncode
-
-
-def validatehex(values):
-    if re.search(r"^[0-9a-fA-F:\s]*$", values):
-        # Normalize the HEX
-        values = values.replace(':', '')
-        values = values.replace(' ', '')
-        values = values.lower()
-        list = iter(values)
-        values = ':'.join(a + b for a, b in zip(list, list))
-        hexvalue = True
-        return hexvalue, values
-    else:
-        hexvalue = False
-        return hexvalue, values
-
-
-def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count):
-    incompatible_options = [ 12, 124, 125, 146, 159, 212 ]
-    validate_options = [ 43, 151 ]
-    if optioncode in incompatible_options:
-        logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    elif optioncode in validate_options:
-        if optioncode == 151:
-            logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-        elif optioncode == 43:
-            if hexvalue == True:
-                logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-            elif hexvalue == False:
-                logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    else:
-        None
-
-
-def validatenetwork(address, cidr, count):
-    if cidr == '32':
-        logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
-    else:
-        None
-
-def dhcplease_node(xmlobject):
-    '''
-    Determine Lease State
-    '''
-    member = ''
-    for property in xmlobject:
-        count = False
-        if property.attrib['NAME'] == 'node_id':
-            node = property.attrib['VALUE']
-        if property.attrib['NAME'] == 'binding_state' and property.attrib['VALUE'] == 'active':
-            member = node
-
-    return member
 
 
 def searchrootobjects(xmlfile, iterations):
@@ -221,6 +91,83 @@ def searchrootobjects(xmlfile, iterations):
 
     return
 
+
+def process_onedb(xmlfile, iterations):
+    '''
+    Process onedb.xml
+    '''
+    # parser = etree.XMLPullParser(target=AttributeFilter())
+    report = collections.defaultdict(list)
+    object_counts = collections.Counter()
+    member_counts = collections.Counter()
+    feature_enabled = collections.defaultdict(bool)
+
+    report['counts'] = object_counts
+    report['features'] = feature_enabled
+    report['member_counts'] = collections.defaultdict()
+    # node_lease_count = collections.Counter()
+
+    OBJECTS = dbobjects.DBOBJECTS()
+    with tqdm.tqdm(total=iterations) as pbar:
+        count = 0
+        #xmlfile.seek(0)
+        context = etree.iterparse(xmlfile, events=('start','end'))
+        for event, elem in context:
+            if event == 'start' and elem.tag == 'OBJECT':
+                count += 1
+                try:
+                    obj_value = dbobjects.get_object_value(elem)
+                    obj_type = OBJECTS.obj_type(obj_value)
+                    if OBJECTS.included(obj_value):
+                        logging.debug('Processing object {}'.format(obj_value))
+                        for action in OBJECTS.actions(obj_value):
+                            if action == 'count':
+                                object_counts[obj_value] += 1
+                            elif action == 'enabled':
+                                feature_enabled[obj_value] = True
+                            elif action == 'process':
+                                process_object = getattr(dbobjects, OBJECTS.func(obj_value))
+                                # onsider using a pandas dataframe
+                                response = process_object(elem, count)
+                                if response:
+                                    report[obj_value].append(response)
+                            elif action == 'member':
+                                process_object = getattr(dbobjects, OBJECTS.func(obj_value))
+                                if obj_type not in report['member_counts'].keys():
+                                    report['member_counts'][obj_type] = collections.Counter()
+                                member = process_object(elem)
+                                if member:
+                                    report['member_counts'][obj_type][member] += 1
+                            else:
+                                logging.warning('Action: {} not implemented'.format(action))
+                                None
+                    else:
+                        logging.debug('Object: {} not defined'.format(obj_value))
+                    
+                        
+                except:
+                    raise
+                    print("Shouldn't be here")
+                    None
+                pbar.update(1)
+            elem.clear()
+
+        '''
+        # Log lease info
+        for key in node_lease_count:
+            logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
+        '''
+
+    return report
+
+
+def output_reports(report):
+    '''
+    Generate and output reports
+    '''
+    pprint.pprint(report)
+
+    return
 
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
@@ -265,12 +212,16 @@ def main():
         t2 = time.perf_counter() - t
         print(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
 
-        iterations = rawincount(xmlfile)
+        iterations = dbobjects.rawincount(xmlfile)
         xmlfile.seek(0)
         t3 = time.perf_counter() - t2
+
         print(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
         writeheaders()
-        searchrootobjects(xmlfile, iterations)
+        # searchrootobjects(xmlfile, iterations)
+        db_report = process_onedb(xmlfile, iterations)
+        output_reports(db_report)
+
         t4 = time.perf_counter() - t
         print(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
 
