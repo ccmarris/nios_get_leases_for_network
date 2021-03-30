@@ -1,0 +1,52 @@
+---
+objects:
+  #Template
+  object:
+      type: obj_type
+      header: header
+      actions:
+        - count
+        - process
+        - enabled
+        - member
+      func: proc_obj
+      report:
+        - se
+        - pm
+
+  # DHCP Options
+  .com.infoblox.dns.option:
+      type: dhcpoption
+      header: HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE
+      actions:
+        - process
+      func: processdhcpoption
+
+  # IPv4 Networks 
+  .com.infoblox.dns.network:
+      type: dhcpnetwork
+      actions:
+        - count
+        - process
+      func: process_network
+  
+  # IPv6 Networks
+  .com.infoblox.dhcp.ipv6.networks:
+      type: ipv6network
+      actions:
+        - count
+        - enabled
+
+  # DHCP leases
+  .com.infoblox.dns.lease:
+      type: dhcplease
+      actions:
+        - member
+      func: member_leases
+
+  # DTC
+  .com.infoblox.dns.dtc:
+        type: DTC
+        actions:
+            - enabled
+        
