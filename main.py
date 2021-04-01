@@ -33,11 +33,11 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.1'
+__version__ = '0.4.5'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
-import dbobjects
+import dblib
 import argparse, tarfile, logging, re, time, sys, tqdm
 import collections
 import pprint
@@ -72,7 +72,7 @@ def process_onedb(xmlfile, iterations):
     report['member_counts'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
 
-    OBJECTS = dbobjects.DBCONFIG()
+    OBJECTS = dblib.DBCONFIG()
     with tqdm.tqdm(total=iterations) as pbar:
         count = 0
         #xmlfile.seek(0)
@@ -81,28 +81,38 @@ def process_onedb(xmlfile, iterations):
             if event == 'start' and elem.tag == 'OBJECT':
                 count += 1
                 try:
-                    obj_value = dbobjects.get_object_value(elem)
+                    obj_value = dblib.get_object_value(elem)
                     obj_type = OBJECTS.obj_type(obj_value)
                     if OBJECTS.included(obj_value):
                         logging.debug('Processing object {}'.format(obj_value))
                         for action in OBJECTS.actions(obj_value):
                             if action == 'count':
                                 object_counts[obj_value] += 1
+
                             elif action == 'enabled':
-                                feature_enabled[obj_value] = True
+                                feature_enabled[obj_value] = dblib.check_feature(elem)
+                                print("Feature enabled {}: {}".format(obj_value, feature_enabled[obj_value]))
+
                             elif action == 'process':
-                                process_object = getattr(dbobjects, OBJECTS.func(obj_value))
+                                func = OBJECTS.func(obj_value)
+                                process_object = getattr(dblib, func)
                                 # onsider using a pandas dataframe
-                                response = process_object(elem, count)
+                                if func == 'process_object':
+                                    capture_properties = OBJECTS.properties(obj_value)
+                                    response = process_object(elem, capture_properties)
+                                else: 
+                                    response = process_object(elem, count)
                                 if response:
                                     report['processed'][obj_value].append(response)
+
                             elif action == 'member':
-                                process_object = getattr(dbobjects, OBJECTS.func(obj_value))
+                                process_object = getattr(dblib, OBJECTS.func(obj_value))
                                 if obj_type not in report['member_counts'].keys():
                                     report['member_counts'][obj_value] = collections.Counter()
                                 member = process_object(elem)
                                 if member:
                                     report['member_counts'][obj_value][member] += 1
+                                    
                             else:
                                 logging.warning('Action: {} not implemented'.format(action))
                                 None
@@ -131,13 +141,13 @@ def output_reports(report):
     Generate and output reports
     '''
     pprint.pprint(report)
-    CONFIG = dbobjects.DBCONFIG()
+    CONFIG = dblib.DBCONFIG()
 
     for section in CONFIG.reports():
         if section in report.keys():
             pprint.pprint(section)
         else:
-            log.error('Report {} not implemented'.format(section))
+            logging.error('Report {} not implemented'.format(section))
             print('Report {} not implemented'.format(section))
 
 
@@ -195,7 +205,7 @@ def main():
         t2 = time.perf_counter() - t
         print(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
 
-        iterations = dbobjects.rawincount(xmlfile)
+        iterations = dblib.rawincount(xmlfile)
         xmlfile.seek(0)
         t3 = time.perf_counter() - t2
 

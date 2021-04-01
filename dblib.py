@@ -10,7 +10,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210321
+ Date Last Updated: 20210330
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -37,7 +37,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.0'
+__version__ = '0.4.5'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -49,7 +49,7 @@ from lxml import etree
 from itertools import (takewhile,repeat)
 
 
-class DBOBJECTS():
+class DBCONFIG():
     '''
     Define Class for onedb.xml db objects
     '''
@@ -58,14 +58,14 @@ class DBOBJECTS():
         '''
         Initialise Class Using YAML config
         '''
-        self.dbobjects = {}
+        self.config = {}
    
         # Check for inifile and raise exception if not found
         if os.path.isfile(cfg_file):
             # Attempt to read api_key from ini file
             try:
 
-                self.dbobjects = yaml.safe_load(open(cfg_file, 'r'))
+                self.config = yaml.safe_load(open(cfg_file, 'r'))
             except yaml.YAMLError as err:
                 logging.error(err)
                 raise
@@ -77,11 +77,11 @@ class DBOBJECTS():
 
 
     def keys(self):
-        return self.dbobjects['objects'].keys()
+        return self.config['objects'].keys()
 
 
     def count(self):
-        return len(self.dbobjects['objects'])  
+        return len(self.config['objects'])  
 
 
     def included(self, dbobj):
@@ -103,7 +103,7 @@ class DBOBJECTS():
         '''
         t = None
         if self.included(dbobj):
-            t = self.dbobjects['objects'][dbobj]['type']
+            t = self.config['objects'][dbobj]['type']
         else:
             t = None
         
@@ -115,8 +115,8 @@ class DBOBJECTS():
         Return name of function for dbobj
         '''
         if self.included(dbobj):
-            if 'header' in self.dbobjects['objects'][dbobj]:
-                header = self.dbobjects['objects'][dbobj]['header']
+            if 'header' in self.config['objects'][dbobj]:
+                header = self.config['objects'][dbobj]['header']
             else:
                 header = ''
         else:
@@ -132,7 +132,7 @@ class DBOBJECTS():
         '''
         actions = []
         if self.included(dbobj):
-            actions = self.dbobjects['objects'][dbobj]['actions']
+            actions = self.config['objects'][dbobj]['actions']
         else:
             actions = []
         
@@ -144,8 +144,8 @@ class DBOBJECTS():
         Return name of function for dbobj
         '''
         if self.included(dbobj):
-            if 'func' in self.dbobjects['objects'][dbobj]:
-                function = self.dbobjects['objects'][dbobj]['func']
+            if 'func' in self.config['objects'][dbobj]:
+                function = self.config['objects'][dbobj]['func']
             else:
                 function = None
         else:
@@ -155,22 +155,66 @@ class DBOBJECTS():
         return function
 
 
-    def reports(self, dbobj):
+    def report_types(self, dbobj):
         '''
         Return list of reports for dbobj
         '''
         reports = []
         if self.included(dbobj):
-            reports = self.dbobjects['objects'][dbobj]['reports']
+            reports = self.config['objects'][dbobj]['reports']
         else:
-            reports = []
+            reports = None
         
         return actions
    
-            
+
+    def properties(self, dbobj):
+        return self.config['objects'][dbobj]['properties']
+
+
+    def reports(self):
+        return self.config['reports']
+
+
+    def incompatible_options(self):
+        return self.config['incompatible_options']
+   
+
+    def validate_options(self):
+        return self.config['validate_options']
 
 
 # *** Functions ***
+
+def check_feature(xmlobject):
+    '''
+    Check for feature enabled
+    '''
+    enabled = None
+    for property in xmlobject:
+        if property.attrib['NAME'] == 'enabled':
+            if property.attrib['VALUE'] == 'true':
+                enabled = True
+            else:
+                enabled = False
+            break
+        else:
+            enabled = None
+    return enabled
+
+
+def process_object(xmlobject, capture_properties):
+    '''
+    Generic Object Capture
+    '''
+    report = collections.defaultdict()
+    for property in xmlobject:
+        if property.attrib['NAME'] == '__type':
+            obj_value = property.attrib['VALUE']
+        if property.attrib['NAME'] in capture_properties:
+            report[property.attrib['NAME']] = property.attrib['VALUE'] 
+    return report
+
 
 def processdhcpoption(xmlobject, count):
     parent = optiondef = value = ''
@@ -208,6 +252,18 @@ def process_network(xmlobject, count):
 def process_leases(xmlobject, count):
     return
 
+def process_zone(xmlobject, count):
+    '''
+    Process zone info
+    '''
+    ztype = ''
+    zone = ''
+    for property in xmlobject:
+        if property.attrib['NAME'] == 'zone_type':
+            ztype = property.attrib['VALUE']
+        if property.attrib['NAME'] == 'name':
+            zone = property.attrib['VALUE']
+    return [ zone, ztype ]
 
 def rawincount(filename):
     bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
@@ -297,8 +353,13 @@ def validatehex(values):
 
 
 def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count):
-    incompatible_options = [ 12, 124, 125, 146, 159, 212 ]
-    validate_options = [ 43, 151 ]
+    '''
+    Validate DHCP Options
+    '''
+    CONFIG = DBCONFIG()
+    incompatible_options = CONFIG.incompatible_options()
+    validate_options = CONFIG.validate_options()
+
     if optioncode in incompatible_options:
         logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
         r = 'DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
