@@ -33,11 +33,11 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.3'
+__version__ = '0.3.5'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
-import dbobjects
+import dblib
 import argparse, tarfile, logging, re, time, sys, tqdm
 import collections
 from itertools import (takewhile,repeat)

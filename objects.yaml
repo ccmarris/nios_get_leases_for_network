@@ -1,12 +1,32 @@
 ---
+reports:
+  - processed
+  - counts
+  - features
+  - member_counts
+
+incompatible_options:
+  - 12
+  - 58
+  - 59
+  - 124
+  - 125
+  - 146
+  - 159
+  - 212 
+
+validate_options:
+  - 43
+  - 151
+
 objects:
   #Template
   object:
       type: obj_type
       header: header
       actions:
-        - count
         - process
+        - count
         - enabled
         - member
       func: proc_obj
@@ -14,10 +34,22 @@ objects:
         - se
         - pm
 
+
+  # Nodes
+  .com.infoblox.one.virtual_node:
+      type: Member
+      actions:
+        - process
+      func: process_object
+      properties:
+        - member_type
+        - virtual_oid
+        - host_name
+
   # DHCP Options
   .com.infoblox.dns.option:
       type: dhcpoption
-      header: HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE
+      header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE
       actions:
         - process
       func: processdhcpoption
@@ -25,6 +57,7 @@ objects:
   # IPv4 Networks 
   .com.infoblox.dns.network:
       type: dhcpnetwork
+      header: HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE
       actions:
         - count
         - process
@@ -40,13 +73,32 @@ objects:
   # DHCP leases
   .com.infoblox.dns.lease:
       type: dhcplease
+      header: HEADER-LEASECOUNT,MEMBER,ACTIVELEASES
       actions:
         - member
       func: member_leases
+
+  # RPZ
+  .com.infoblox.dns.zone:
+        type: DNS Zone
+        actions:
+            - count
+            - process
+        func: process_zone
 
   # DTC
   .com.infoblox.dns.dtc:
         type: DTC
         actions:
             - enabled
+
+  # Captive Portal
+  .com.infoblox.dns.member_dhcp_captive_portal:
+        type: Captive Portal
+        actions:
+            - enabled
+
+
+
+.com.infoblox.analytics.active_blacklist_rpz:
         
