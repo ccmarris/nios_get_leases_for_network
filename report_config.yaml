@@ -1,0 +1,11 @@
+---
+# NIOS onedb analysis report configuration file
+# Version 0.0.1
+# Last updated: 20210406
+# Author: Chris Marrison
+reports:
+  - processed
+  - collected
+  - counters
+  - features
+  - member_counts
