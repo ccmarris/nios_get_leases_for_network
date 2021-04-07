@@ -1,10 +1,10 @@
 ---
-reports:
-  - processed
-  - counts
-  - features
-  - member_counts
+# NIOS onedb analysis configuration file
+# Version 0.2.5
+# Last updated: 20210401
+# Author: Chris Marrison
 
+# Incompatible DHCP Options
 incompatible_options:
   - 12
   - 58
@@ -15,36 +15,133 @@ incompatible_options:
   - 159
   - 212 
 
+# DHCP Options that need further validation
 validate_options:
   - 43
   - 151
 
+# List of objects and parameters
 objects:
-  #Template
+  #Template object
   object:
       type: obj_type
       header: header
       actions:
         - process
+        - collect
         - count
         - enabled
         - member
       func: proc_obj
+      properties:
+        - list
+        - of
+        - properties
       report:
         - se
         - pm
 
 
+  # Grid
+  .com.infoblox.one.cluster:
+    type: Grid
+    actions:
+      - collect
+    properties:
+      - name
+      - virtual_node_count
+      - physical_node_count
+      - heka_opt_in
+      - enable_wins_forwarding
+      - enable_extended_discovery
+    reports:
+      - pm
+
   # Nodes
   .com.infoblox.one.virtual_node:
       type: Member
       actions:
-        - process
-      func: process_object
+        - collect
       properties:
         - member_type
         - virtual_oid
         - host_name
+
+  # Cluster DHCP Config
+  .com.infoblox.dns.cluster_dhcp_properties:
+      type: Grid DHCP Settings
+      actions:
+        - collect
+      properties:
+        - dns_update_style
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - deny_bootp
+
+  # Member DHCP Config
+  .com.infoblox.dns.member_dhcp_properties:
+      type: Member DHCP Settings
+      actions:
+        - collect
+      properties:
+        - dns_update_style
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - use_gss_tsig_keys
+        - v6_enable_gss_tsig
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - deny_bootp
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - recycle_leases
+        - service_enabled
+        - virtual_node
+
+  # Cluster DNS Config
+  .com.infoblox.dns.cluster_dns_properties:
+      type: Grid DNS Settings
+      actions:
+        - collect
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - enable_dns64
+        - blacklist_enabled
+
+  # Member DNS Config
+  .com.infoblox.dns.member_dns_properties:
+      type: Member DNS Properties
+      actions:
+        - collect
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_dns64
+        - enable_gss_tsig
+        - log_queries
+        - service_enabled
+        - virtual_node
 
   # DHCP Options
   .com.infoblox.dns.option:
@@ -61,6 +158,16 @@ objects:
       actions:
         - count
         - process
+        - collect
+      properties:
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - deny_bootp
       func: process_network
   
   # IPv6 Networks
@@ -98,7 +205,38 @@ objects:
         actions:
             - enabled
 
-
-
-.com.infoblox.analytics.active_blacklist_rpz:
+  # Blocklist
+  .com.infoblox.analytics.active_blacklist_rpz:
+      type: blacklist
+      actions:
+        - count
         
+  
+  # Outbound API
+  .com.infoblox.one.endpoint:
+    type: Outbound API
+    actions:
+      - collect
+    properties:
+      - disabled
+      - type
+
+  .com.infoblox.one.endpoint_restapi:
+    type: Outbound API
+    actions:
+      - collect
+    properties:
+      - vendor_identifier
+
+  .com.infoblox.one.template_restapi:
+    type: Outbound API Endpoint
+    actions:
+      -
+  
+  # Data Connector
+  .com.infoblox.one.datacollector_cluster:
+    type: Data Connector
+    actions:
+      - collect
+    properties:
+      - enable_registration

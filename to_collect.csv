@@ -1,0 +1,56 @@
+Grid level DNS GSS-TSIG, .com.infoblox.dns.cluster_dhcp_properties, enable_gss_tsig, v6_enable_gss_tsig
+Member DNS GSS-TSIG, .com.infoblox.dns.member_dns_properties, enable_gss_tsig, v6_enable_gss_tsig
+Grid Level DHCP GSS-TSIG, .com.infoblox.
+Member Level DHCP GSS-TSIG, .com.infoblox.dns.member_dhcp_properties, enable_gss_tsig, v6_enable_gss_tsig
+BOOTP 
+PXE settings (nextserverfilename),
+done, ping before assign,
+DDNS settings below the global level,
+IPAM: Cloud delegated objects
+DNS zone associations,
+lease scavenging,
+ignore option list,
+update on renew (DDNS),
+PXE (+boot server),
+IPv4 filters,
+AD sites,
+(enable) discovery,
+ignore ID (MAC or client ID),
+vlan anything,
+DHCP forwarding,
+fixed address update (DDNS),
+IF-MAP,
+Traffic Controlshared record groups,
+Workflow
+Cloud
+subscriber services,
+blacklist rulesets,
+DNS64 groups,
+query monitoring,
+dynamic update groups,
+DNSSEC,
+RPZ (anything),
+sort list,
+rrset ordering,
+DNS scavenging,
+hostname compliance,
+dynamic update patterns,
+DNS integrity check,
+port reservation,
+protect records,
+ADMINISTRATION: Workflowcloud,
+authentication server groups,
+GRID: HSM GroupMicrosoft Servers,
+Amazon,
+Ecosystem,
+BFD templatesTFTP,
+HTTP,
+FTP,
+NTP,
+bloxTools,
+TAXII,
+Threat Protection,
+Subscriber Collection,
+Super Host
+Shared Networks
+Captive Portal, .com.infoblox.dns.member_dhcp_captive_portal, enabled
