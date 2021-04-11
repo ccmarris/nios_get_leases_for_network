@@ -8,7 +8,7 @@
 
  Author: John Neerdael
 
- Date Last Updated: 20210330
+ Date Last Updated: 20210407
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.5'
+__version__ = '0.4.6'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -67,7 +67,8 @@ def process_onedb(xmlfile, iterations):
     feature_enabled = collections.defaultdict(bool)
 
     report['processed'] = collections.defaultdict(list)
-    report['counts'] = object_counts
+    report['collected'] = collections.defaultdict(list)
+    report['counters'] = object_counts
     report['features'] = feature_enabled
     report['member_counts'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
@@ -89,21 +90,34 @@ def process_onedb(xmlfile, iterations):
                             if action == 'count':
                                 object_counts[obj_value] += 1
 
-                            elif action == 'enabled':
-                                feature_enabled[obj_value] = dblib.check_feature(elem)
-                                print("Feature enabled {}: {}".format(obj_value, feature_enabled[obj_value]))
+                            elif action == 'feature':
+                                feature = OBJECTS.feature(obj_value)
+                                keypair = OBJECTS.keypair(obj_value)
+                                if not feature_enabled[feature]:
+                                    if len(keypair) == 2:
+                                        # Assume valid keypair
+                                        feature_enabled[feature] = dblib.check_feature(elem,
+                                                                                        key_name=keypair[0],
+                                                                                        expected_value=keypair[1])
+                                    else:
+                                        # Try default check
+                                        feature_enabled[feature] = dblib.check_feature(elem)
+                                else:
+                                    # Feature has already been found
+                                    None
 
                             elif action == 'process':
-                                func = OBJECTS.func(obj_value)
-                                process_object = getattr(dblib, func)
+                                process_object = getattr(dblib, OBJECTS.func(obj_value))
                                 # onsider using a pandas dataframe
-                                if func == 'process_object':
-                                    capture_properties = OBJECTS.properties(obj_value)
-                                    response = process_object(elem, capture_properties)
-                                else: 
-                                    response = process_object(elem, count)
+                                response = process_object(elem, count)
                                 if response:
                                     report['processed'][obj_value].append(response)
+
+                            elif action == 'collect':
+                                collect_properties = OBJECTS.properties(obj_value)
+                                response = dblib.process_object(elem, collect_properties)
+                                if response:
+                                    report['collected'][obj_value].append(response)
 
                             elif action == 'member':
                                 process_object = getattr(dblib, OBJECTS.func(obj_value))
@@ -122,8 +136,6 @@ def process_onedb(xmlfile, iterations):
                         
                 except:
                     raise
-                    print("Shouldn't be here")
-                    None
                 pbar.update(1)
             elem.clear()
 
@@ -140,12 +152,15 @@ def output_reports(report):
     '''
     Generate and output reports
     '''
-    pprint.pprint(report)
-    CONFIG = dblib.DBCONFIG()
+    OBJECTS = dblib.DBCONFIG()
+    REPORT_CONFIG = dblib.REPORT_CONFIG()
 
-    for section in CONFIG.reports():
+    for section in REPORT_CONFIG.report_sections():
         if section in report.keys():
-            pprint.pprint(section)
+            if section == 'collected':
+                dblib.report_collected(report, REPORT_CONFIG, OBJECTS)
+            elif section == 'processed':
+                dblib.report_processed(report, REPORT_CONFIG, OBJECTS)
         else:
             logging.error('Report {} not implemented'.format(section))
             print('Report {} not implemented'.format(section))
@@ -161,6 +176,7 @@ def output_reports(report):
     '''
 
     return
+
 
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
