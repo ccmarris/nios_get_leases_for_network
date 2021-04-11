@@ -10,7 +10,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210330
+ Date Last Updated: 20210407
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -37,7 +37,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.5'
+__version__ = '0.4.7'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -45,6 +45,8 @@ import tarfile, logging, re, time, sys, tqdm
 import os
 import collections
 import yaml
+import pandas as pd
+import pprint
 from lxml import etree
 from itertools import (takewhile,repeat)
 
@@ -75,9 +77,23 @@ class DBCONFIG():
 
         return
 
-
     def keys(self):
+        return self.config.keys()
+
+    def objects(self):
         return self.config['objects'].keys()
+
+
+    def obj_keys(self, dbobj):
+        '''
+        Return Objects Keys
+        '''
+        if self.included(dbobj):
+             response = self.config['objects'][dbobj].keys()
+        else:
+            response = None
+        
+        return response
 
 
     def count(self):
@@ -89,7 +105,7 @@ class DBCONFIG():
         Check whether this dbobj is configured
         '''
         status = False
-        if dbobj in self.keys():
+        if dbobj in self.objects():
             status = True
         else:
             status = False
@@ -155,6 +171,37 @@ class DBCONFIG():
         return function
 
 
+    def properties(self, dbobj):
+        return self.config['objects'][dbobj]['properties']
+
+
+    def feature(self, dbobj):
+        '''
+        Return 'feature' value if exists
+        '''
+        if self.included(dbobj):
+            if 'feature' in self.obj_keys(dbobj):
+                r = self.config['objects'][dbobj]['feature']
+            else:
+                r = None
+        else:
+            r = None
+        
+        return r
+
+
+    def keypair(self, dbobj):
+        '''
+        Return Keypair as a list
+        '''
+        if 'keypair' in self.obj_keys(dbobj):
+            response = self.config['objects'][dbobj]['keypair']
+        else:
+            response = None
+        
+        return response
+
+
     def report_types(self, dbobj):
         '''
         Return list of reports for dbobj
@@ -166,14 +213,6 @@ class DBCONFIG():
             reports = None
         
         return actions
-   
-
-    def properties(self, dbobj):
-        return self.config['objects'][dbobj]['properties']
-
-
-    def reports(self):
-        return self.config['reports']
 
 
     def incompatible_options(self):
@@ -184,16 +223,46 @@ class DBCONFIG():
         return self.config['validate_options']
 
 
+class REPORT_CONFIG():
+    '''
+    Define Class for reporting db objects
+    '''
+
+    def __init__(self, cfg_file='report_config.yaml'):
+        '''
+        Initialise Class Using YAML config
+        '''
+        self.config = {}
+   
+        # Check for inifile and raise exception if not found
+        if os.path.isfile(cfg_file):
+            # Attempt to read api_key from ini file
+            try:
+
+                self.config = yaml.safe_load(open(cfg_file, 'r'))
+            except yaml.YAMLError as err:
+                logging.error(err)
+                raise
+        else:
+            logging.error('No such file {}'.format(cfg_file))
+            raise FileNotFoundError('YAML object file "{}" not found.'.format(cfg_file))
+
+        return
+
+    def report_sections(self):
+        return self.config['report_sections']
+  
+
 # *** Functions ***
 
-def check_feature(xmlobject):
+def check_feature(xmlobject, key_name='enabled', expected_value='true'):
     '''
     Check for feature enabled
     '''
     enabled = None
     for property in xmlobject:
-        if property.attrib['NAME'] == 'enabled':
-            if property.attrib['VALUE'] == 'true':
+        if property.attrib['NAME'] == key_name:
+            if property.attrib['VALUE'] == expected_value:
                 enabled = True
             else:
                 enabled = False
@@ -203,17 +272,43 @@ def check_feature(xmlobject):
     return enabled
 
 
-def process_object(xmlobject, capture_properties):
+def process_object(xmlobject, collect_properties):
     '''
     Generic Object Capture
+
+    Parameters:
+        xmlobject (obj): XML Object
+        collect_properties (list): list of XML Properties to collect
+
+    Returns:
+        Dictionary of properties
     '''
-    report = collections.defaultdict()
+    collected_data = collections.defaultdict()
     for property in xmlobject:
         if property.attrib['NAME'] == '__type':
             obj_value = property.attrib['VALUE']
-        if property.attrib['NAME'] in capture_properties:
-            report[property.attrib['NAME']] = property.attrib['VALUE'] 
-    return report
+        if property.attrib['NAME'] in collect_properties:
+            collected_data[property.attrib['NAME']] = property.attrib['VALUE'] 
+    return collected_data
+
+
+def dump_object(xmlobject):
+    '''
+    Generic Object Capture
+
+    Parameters:
+        xmlobject (obj): XML Object
+
+    Returns:
+        Dictionary of properties
+    '''
+    collected_properties = collections.defaultdict()
+    for property in xmlobject:
+        obj_value = property.attrib['VALUE']
+        collected_properties[property.attrib['NAME']] = property.attrib['VALUE'] 
+    pprint.pprint(collected_properties)
+
+    return collected_properties
 
 
 def processdhcpoption(xmlobject, count):
@@ -252,6 +347,7 @@ def process_network(xmlobject, count):
 def process_leases(xmlobject, count):
     return
 
+"""
 def process_zone(xmlobject, count):
     '''
     Process zone info
@@ -261,9 +357,11 @@ def process_zone(xmlobject, count):
     for property in xmlobject:
         if property.attrib['NAME'] == 'zone_type':
             ztype = property.attrib['VALUE']
-        if property.attrib['NAME'] == 'name':
+        if property.attrib['NAME'] == 'display_name':
             zone = property.attrib['VALUE']
-    return [ zone, ztype ]
+    return [ zone, ztype, count ]
+"""
+
 
 def rawincount(filename):
     bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
@@ -360,24 +458,26 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     incompatible_options = CONFIG.incompatible_options()
     validate_options = CONFIG.validate_options()
 
+    r = []
+
     if optioncode in incompatible_options:
         logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-        r = 'DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
+        r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     elif optioncode in validate_options:
         if optioncode == 151:
             logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-            r = 'DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
+            r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
         elif optioncode == 43:
             if hexvalue == True:
                 logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-                r = 'DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
+                r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
             elif hexvalue == False:
                 logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-                r = 'DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count)
+                r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
-        r = ''
+        r = []
     
-    validation = [ r ]
+    validation = r
     
     return validation
 
@@ -406,42 +506,6 @@ def member_leases(xmlobject):
     return member
 
 
-def searchrootobjects(xmlfile, iterations):
-    # parser = etree.XMLPullParser(target=AttributeFilter())
-    node_lease_count = collections.Counter()
-    with tqdm.tqdm(total=iterations) as pbar:
-        count = 0
-        #xmlfile.seek(0)
-        context = etree.iterparse(xmlfile, events=('start','end'))
-        for event, elem in context:
-            if event == 'start' and elem.tag == 'OBJECT':
-                count += 1
-                try:
-                    object = validateobject(elem)
-                    if object == 'dhcpoption':
-                        type, parentobj, optionspace, optioncode, hexvalue, optionvalue = processdhcpoption(elem)
-                        validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count)
-                    elif object == 'dhcpnetwork':
-                        address, cidr = processnetwork(elem)
-                        validatenetwork(address, cidr, count)
-                    elif object == 'dhcplease':
-                        node = dhcplease_node(elem)
-                        if node:
-                            node_lease_count[node] += 1
-                    else:
-                        None
-                except:
-                    None
-                pbar.update(1)
-            elem.clear()
-
-        # Log lease info
-        for key in node_lease_count:
-            logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
-
-    return
-
-
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
     logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE')
@@ -449,5 +513,36 @@ def writeheaders():
     return
 
 
-if __name__ == '__main__':
-    main()
+def report_processed(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Generate and Output report for processed content
+    '''
+    for obj in report['processed'].keys():
+        if DBOBJECTS.header(obj):
+            labels = DBOBJECTS.header(obj).split(',')
+        else:
+            labels = []
+        print(DBOBJECTS.obj_type(obj))
+        df = pd.DataFrame(report['processed'][obj], columns=labels)
+        pprint.pprint(df)
+
+    return
+
+
+def report_collected(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Generate and Output report for collected content
+    '''
+    for obj in report['collected'].keys():
+        print(DBOBJECTS.obj_type(obj))
+        df = pd.DataFrame(report['collected'][obj])
+        pprint.pprint(df)
+    return
+
+
+def report_counters(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Report Counters
+    '''
+    for counter in report.keys():
+        print(report['counter'])
