@@ -8,7 +8,7 @@
 
  Author: John Neerdael
 
- Date Last Updated: 20210407
+ Date Last Updated: 20210418
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.6'
+__version__ = '0.4.8'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -51,12 +51,14 @@ def parseargs():
     parser.add_argument('-d', '--database', action="store", help="Path to database file", required=True)
     parser.add_argument('-v', '--version', action='version', version='%(prog)s '+ __version__)
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
+    parser.add_argument('--dump', type=str, default='', help="Dump Object")
+    parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
     return parser.parse_args()
 
 
-def process_onedb(xmlfile, iterations):
+def process_onedb(xmlfile, iterations, silent_mode=False):
     '''
     Process onedb.xml
     '''
@@ -64,17 +66,17 @@ def process_onedb(xmlfile, iterations):
     report = {}
     object_counts = collections.Counter()
     member_counts = collections.Counter()
-    feature_enabled = collections.defaultdict(bool)
+    enabled_features = collections.defaultdict(bool)
 
     report['processed'] = collections.defaultdict(list)
     report['collected'] = collections.defaultdict(list)
     report['counters'] = object_counts
-    report['features'] = feature_enabled
+    report['features'] = enabled_features
     report['member_counts'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
 
     OBJECTS = dblib.DBCONFIG()
-    with tqdm.tqdm(total=iterations) as pbar:
+    with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
         count = 0
         #xmlfile.seek(0)
         context = etree.iterparse(xmlfile, events=('start','end'))
@@ -87,25 +89,28 @@ def process_onedb(xmlfile, iterations):
                     if OBJECTS.included(obj_value):
                         logging.debug('Processing object {}'.format(obj_value))
                         for action in OBJECTS.actions(obj_value):
+                            # Action Count
                             if action == 'count':
                                 object_counts[obj_value] += 1
 
+                            # Action Enabled
                             elif action == 'feature':
                                 feature = OBJECTS.feature(obj_value)
                                 keypair = OBJECTS.keypair(obj_value)
-                                if not feature_enabled[feature]:
-                                    if len(keypair) == 2:
+                                if not enabled_features[feature]:
+                                    if keypair and len(keypair) == 2:
                                         # Assume valid keypair
-                                        feature_enabled[feature] = dblib.check_feature(elem,
+                                        enabled_features[feature] = dblib.check_feature(elem,
                                                                                         key_name=keypair[0],
                                                                                         expected_value=keypair[1])
                                     else:
                                         # Try default check
-                                        feature_enabled[feature] = dblib.check_feature(elem)
+                                        enabled_features[feature] = dblib.check_feature(elem)
                                 else:
                                     # Feature has already been found
                                     None
 
+                            # Action Process
                             elif action == 'process':
                                 process_object = getattr(dblib, OBJECTS.func(obj_value))
                                 # onsider using a pandas dataframe
@@ -113,12 +118,14 @@ def process_onedb(xmlfile, iterations):
                                 if response:
                                     report['processed'][obj_value].append(response)
 
+                            # Action Collect 
                             elif action == 'collect':
                                 collect_properties = OBJECTS.properties(obj_value)
                                 response = dblib.process_object(elem, collect_properties)
                                 if response:
                                     report['collected'][obj_value].append(response)
 
+                            # Action Member Count
                             elif action == 'member':
                                 process_object = getattr(dblib, OBJECTS.func(obj_value))
                                 if obj_type not in report['member_counts'].keys():
@@ -127,6 +134,7 @@ def process_onedb(xmlfile, iterations):
                                 if member:
                                     report['member_counts'][obj_value][member] += 1
                                     
+                            # Action Not Implemented
                             else:
                                 logging.warning('Action: {} not implemented'.format(action))
                                 None
@@ -148,7 +156,30 @@ def process_onedb(xmlfile, iterations):
     return report
 
 
-def output_reports(report):
+def dump_object(db_obj, xmlfile):
+    '''
+    Dump first instance of specified object
+
+    Parameters:
+        one_db_obj (str): OneDB Object Type
+    
+    '''
+    found = False
+    context = etree.iterparse(xmlfile, events=('start','end'))
+    for event, elem in context:
+        if event == 'start' and elem.tag == 'OBJECT':
+            obj_value = dblib.get_object_value(elem)
+            if obj_value == db_obj:
+                dblib.dump_object(elem)
+                found = True
+                break
+    if not found:
+        print('Object: {} not found in db'.format(db_obj))
+
+    return
+
+
+def output_reports(report, outfile):
     '''
     Generate and output reports
     '''
@@ -158,9 +189,21 @@ def output_reports(report):
     for section in REPORT_CONFIG.report_sections():
         if section in report.keys():
             if section == 'collected':
-                dblib.report_collected(report, REPORT_CONFIG, OBJECTS)
+                collected_dfs = dblib.report_collected(report, REPORT_CONFIG, OBJECTS)
+                dblib.output_to_excel(collected_dfs, title='Collected_Properties', filename=outfile)
             elif section == 'processed':
-                dblib.report_processed(report, REPORT_CONFIG, OBJECTS)
+                processed_dfs = dblib.report_processed(report, REPORT_CONFIG, OBJECTS)
+                dblib.output_to_excel(processed_dfs, title='Processed_Objects', filename=outfile)
+            elif section == 'counters':
+                # counters_dfs = dblib.report_counters(report, REPORT_CONFIG, OBJECTS)
+                # pprint.pprint(counters_dfs)
+                dblib.report_counters(report, REPORT_CONFIG, OBJECTS)
+            elif section == 'member_counts':
+                # mcounters_dfs = dblib.report_counters(counters_dfs, REPORT_CONFIG, OBJECTS)
+                # pprint.pprint(mcounters_dfs
+                pprint.pprint(report['member_counts'])
+            elif section == 'features':
+                pprint.pprint(report['features'])
         else:
             logging.error('Report {} not implemented'.format(section))
             print('Report {} not implemented'.format(section))
@@ -189,6 +232,7 @@ def main():
     '''
     Core logic
     '''
+    exitcode = 0
     logfile = ''
     options = parseargs()
     t = time.perf_counter()
@@ -197,10 +241,11 @@ def main():
     # Set up logging
     # log events to the log file and to stdout
     dateTime=time.strftime("%H%M%S-%d%m%Y")
-    if options.customer != '':
-        logfile = f'{options.customer}-{dateTime}.csv'
+    if options.customer:
+        outfile = f'{options.customer}-{dateTime}.xlsx'
     else:
-        logfile = f'{dateTime}.csv'
+        outfile = f'{dateTime}.xlsx'
+    logfile = f'{dateTime}.log'
     file_handler = logging.FileHandler(filename=logfile)
     stdout_handler = logging.StreamHandler(sys.stdout)
     # Output to CLI and config
@@ -214,28 +259,33 @@ def main():
     )
 
     # Extract db from backup
-    print('EXTRACTING DATABASE FROM BACKUP')
+    logging.info('EXTRACTING DATABASE FROM BACKUP')
 
     with tarfile.open(database, "r:gz") as tar:
         xmlfile = tar.extractfile('onedb.xml')
-        t2 = time.perf_counter() - t
-        print(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
+        if not options.dump:
+            t2 = time.perf_counter() - t
+            logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
 
-        iterations = dblib.rawincount(xmlfile)
-        xmlfile.seek(0)
-        t3 = time.perf_counter() - t2
+            iterations = dblib.rawincount(xmlfile)
+            xmlfile.seek(0)
+            t3 = time.perf_counter() - t2
 
-        print(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
-        writeheaders()
+            logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
+            writeheaders()
 
-        # searchrootobjects(xmlfile, iterations)
-        db_report = process_onedb(xmlfile, iterations)
-        output_reports(db_report)
+            # searchrootobjects(xmlfile, iterations)
+            db_report = process_onedb(xmlfile, iterations, silent_mode=options.silent)
+            output_reports(db_report, outfile)
 
-        t4 = time.perf_counter() - t
-        print(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
+            t4 = time.perf_counter() - t
+            logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
+        else:
+            dump_object(options.dump, xmlfile)
 
-    return
+    return exitcode
 
+### Main ###
 if __name__ == '__main__':
-    main()
+    exitcode = main()
+    exit(exitcode)
