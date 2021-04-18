@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis configuration file
-# Version 0.2.5
+# Version 0.2.6
 # Last updated: 20210401
 # Author: Chris Marrison
 
@@ -10,7 +10,6 @@ incompatible_options:
   - 58
   - 59
   - 124
-  - 125
   - 146
   - 159
   - 212 
@@ -19,6 +18,11 @@ incompatible_options:
 validate_options:
   - 43
   - 151
+  - 160
+
+# Previously Checked DHCP Options
+legacy_option_checks:
+  - 125
 
 # List of objects and parameters
 objects:
@@ -30,17 +34,19 @@ objects:
         - process
         - collect
         - count
-        - enabled
+        - feature
         - member
       func: proc_obj
       properties:
         - list
         - of
         - properties
+      keypair:
+        - property_name
+        - expected_value
       report:
         - se
         - pm
-
 
   # Grid
   .com.infoblox.one.cluster:
@@ -93,6 +99,11 @@ objects:
       type: Member DHCP Settings
       actions:
         - collect
+        - feature
+      feature: DHCPv6
+      keypair:
+        - v6_service_enable
+        - 'true'
       properties:
         - dns_update_style
         - enable_cisco_ise_dhcpd_lease_publishing
@@ -114,6 +125,7 @@ objects:
         - overload_bootp
         - recycle_leases
         - service_enabled
+        - v6_service_enable
         - virtual_node
 
   # Cluster DNS Config
@@ -146,7 +158,7 @@ objects:
   # DHCP Options
   .com.infoblox.dns.option:
       type: dhcpoption
-      header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE
+      header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE,OBJECTLINE
       actions:
         - process
       func: processdhcpoption
@@ -160,6 +172,8 @@ objects:
         - process
         - collect
       properties:
+        - address
+        - cidr
         - override_boot_server
         - override_boot_file
         - override_next_server
@@ -175,35 +189,52 @@ objects:
       type: ipv6network
       actions:
         - count
-        - enabled
+        - feature
 
   # DHCP leases
   .com.infoblox.dns.lease:
       type: dhcplease
       header: HEADER-LEASECOUNT,MEMBER,ACTIVELEASES
       actions:
+        - count
         - member
+        - collect
       func: member_leases
+      properties:
+        - binding_state
+        - vnode_id
 
-  # RPZ
+  # Zones
   .com.infoblox.dns.zone:
-        type: DNS Zone
+        type: DNS Zones
         actions:
             - count
-            - process
+            - collect
         func: process_zone
+        properties:
+            - name
+            - display_name
+            - fqdn
+            - view_key
+            - zone_type
+            - primary_type
+            - parent
+            - is_multimaster
+            - is_external_primary
+            - assigned_ns_group
+
 
   # DTC
   .com.infoblox.dns.dtc:
         type: DTC
         actions:
-            - enabled
+            - feature
 
   # Captive Portal
   .com.infoblox.dns.member_dhcp_captive_portal:
         type: Captive Portal
         actions:
-            - enabled
+            - feature
 
   # Blocklist
   .com.infoblox.analytics.active_blacklist_rpz:
@@ -231,7 +262,17 @@ objects:
   .com.infoblox.one.template_restapi:
     type: Outbound API Endpoint
     actions:
-      -
+      - feature
+      - collect
+    keypair:
+      - outbound_type
+      - REST
+    properties:
+      - name
+      - outbound_type
+      - template_type
+      - vendor_identifier
+      - event_type_list
   
   # Data Connector
   .com.infoblox.one.datacollector_cluster:
@@ -240,3 +281,69 @@ objects:
       - collect
     properties:
       - enable_registration
+
+  # DNS Records Types
+  .com.infoblox.dns.bind_a:
+    type: A Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_aaaa:
+    type: AAAA Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_cname:
+    type: CNAME Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_dnskey:
+    type: DNSKEY Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_mx:
+    type: MX Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ns:
+    type: NS Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3:
+    type: NSEC3 Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3param:
+    type: NSEC3PARAM Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ptr:
+    type: PTR Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_rrsig:
+    type: RRSIG Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_soa:
+    type: SOA Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_srv:
+    type: SRV Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_txt:
+    type: TXT Records
+    actions:
+      - count
