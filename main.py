@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.9'
+__version__ = '0.5.0'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -48,14 +48,27 @@ from lxml import etree
 def parseargs():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility')
-    parser.add_argument('-d', '--database', action="store", help="Path to database file", required=True)
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s '+ __version__)
+    parser.add_argument('-d', '--database', action="store", help="Path to database file", default='database.bak')
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
     parser.add_argument('--dump', type=str, default='', help="Dump Object")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
+    parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
     return parser.parse_args()
+
+def report_versions():
+    '''
+    Rerport code and config versions
+    '''
+    DBCONFIG = dblib.DBCONFIG()
+    RCONFIG = dblib.REPORT_CONFIG()
+    version_report = { 'main': __version__, 
+                       'dblib': dblib.__version__, 
+                       'DB Config': DBCONFIG.version(), 
+                       'Report Config': RCONFIG.version() 
+                      }
+    return version_report
 
 
 def process_onedb(xmlfile, iterations, silent_mode=False):
@@ -139,7 +152,7 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
                                 logging.warning('Action: {} not implemented'.format(action))
                                 None
                     else:
-                        logging.warning('Object: {} not defined'.format(obj_value))
+                        logging.debug('Object: {} not defined'.format(obj_value))
                     
                         
                 except:
@@ -228,6 +241,39 @@ def writeheaders():
     return
 
 
+def process_backup(database, outfile, silent_mode=False, dump_obj=None):
+    '''
+    Process Backup File
+    '''
+    t = time.perf_counter()
+
+    # Extract db from backup
+    logging.info('EXTRACTING DATABASE FROM BACKUP')
+
+    with tarfile.open(database, "r:gz") as tar:
+        xmlfile = tar.extractfile('onedb.xml')
+        if not dump_obj:
+            t2 = time.perf_counter() - t
+            logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
+
+            iterations = dblib.rawincount(xmlfile)
+            xmlfile.seek(0)
+            t3 = time.perf_counter() - t2
+
+            logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
+            writeheaders()
+
+            # searchrootobjects(xmlfile, iterations)
+            db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
+            output_reports(db_report, outfile)
+
+            t4 = time.perf_counter() - t
+            logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
+        else:
+            dump_object(dump_obj, xmlfile)
+    
+    return
+
 def main():
     '''
     Core logic
@@ -235,7 +281,6 @@ def main():
     exitcode = 0
     logfile = ''
     options = parseargs()
-    t = time.perf_counter()
     database = options.database
 
     # Set up logging
@@ -252,36 +297,24 @@ def main():
     handlers = [file_handler, stdout_handler]
     # Output to config only
     filehandler = [file_handler]
-    logging.basicConfig(
-        level=options.loglevel,
-        format='%(message)s',
-        handlers=filehandler
-    )
+    if options.silent:
+        logging.basicConfig(
+            level=options.loglevel,
+            format='%(message)s',
+            handlers=filehandler
+            )
+    else:
+        logging.basicConfig(
+            level=options.loglevel,
+            format='%(message)s',
+            handlers=handlers
+            )
 
-    # Extract db from backup
-    logging.info('EXTRACTING DATABASE FROM BACKUP')
-
-    with tarfile.open(database, "r:gz") as tar:
-        xmlfile = tar.extractfile('onedb.xml')
-        if not options.dump:
-            t2 = time.perf_counter() - t
-            logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
-
-            iterations = dblib.rawincount(xmlfile)
-            xmlfile.seek(0)
-            t3 = time.perf_counter() - t2
-
-            logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
-            writeheaders()
-
-            # searchrootobjects(xmlfile, iterations)
-            db_report = process_onedb(xmlfile, iterations, silent_mode=options.silent)
-            output_reports(db_report, outfile)
-
-            t4 = time.perf_counter() - t
-            logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
-        else:
-            dump_object(options.dump, xmlfile)
+    if options.version:
+       v = report_versions()
+       pprint.pprint(v)
+    else:
+       process_backup(database, outfile, silent_mode=options.silent, dump_obj=options.dump)
 
     return exitcode
 
