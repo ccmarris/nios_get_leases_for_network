@@ -1,0 +1,24 @@
+---
+# NIOS onedb analysis report configuration file
+# Version 0.0.1
+# Last updated: 20210406
+# Author: Chris Marrison
+report_sections:
+  - processed
+  - collected
+  - counters
+  - features
+  - member_counts
+
+Incompatible Features:
+  - DHCPv6:
+      section: features
+  - BOOTP:
+      section: collected
+      objects: 
+        - .com.infoblox.dns.cluster_dhcp_properties
+        - .com.infoblox.dns.member_dhcp_properties
+        - .com.infoblox.dns.network
+      properties: 
+      value: 
+
