@@ -11,6 +11,7 @@ incompatible_options:
   - 59
   - 124
   - 146
+  - 156
   - 159
   - 212 
 
@@ -198,7 +199,7 @@ objects:
       actions:
         - count
         - member
-        - collect
+        # - collect
       func: member_leases
       properties:
         - binding_state
