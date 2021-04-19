@@ -10,7 +10,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210407
+ Date Last Updated: 20210419
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -37,7 +37,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.7'
+__version__ = '0.4.9'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -46,6 +46,7 @@ import os
 import collections
 import yaml
 import pandas as pd
+import xlsxwriter
 import pprint
 from lxml import etree
 from itertools import (takewhile,repeat)
@@ -312,6 +313,9 @@ def dump_object(xmlobject):
 
 
 def processdhcpoption(xmlobject, count):
+    '''
+    Look for DHCP options that need further verification
+    '''
     parent = optiondef = value = ''
     for property in xmlobject:
         if property.attrib['NAME'] == 'parent':
@@ -332,6 +336,9 @@ def processdhcpoption(xmlobject, count):
 
 
 def process_network(xmlobject, count):
+    '''
+    Look for /32 networks
+    '''
     cidr = address = ''
     for property in xmlobject:
         if property.attrib['NAME'] == 'cidr':
@@ -340,11 +347,14 @@ def process_network(xmlobject, count):
             address = property.attrib['VALUE']
     report = validatenetwork(address, cidr, count)
     if len(report) == 1 and report[0] == '':
-        report = None
+        report = []
     return report
 
 
 def process_leases(xmlobject, count):
+    '''
+    Place holder
+    '''
     return
 
 """
@@ -371,6 +381,7 @@ def rawincount(filename):
 def validateobject(xmlobject):
     '''
     Validate object type
+    *** Deprecated ***
     '''
     object = ''
     for property in xmlobject:
@@ -388,6 +399,7 @@ def validateobject(xmlobject):
             break
     return object
 
+
 def get_object_value(xmlobject):
     '''
     Return the object value
@@ -399,6 +411,7 @@ def get_object_value(xmlobject):
             break
     
     return str(obj)
+
 
 def checkparentobject(parent):
     objects = re.search(r"(.*)\$(.*)", parent)
@@ -461,18 +474,18 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     r = []
 
     if optioncode in incompatible_options:
-        logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+        # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
         r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     elif optioncode in validate_options:
         if optioncode == 151:
-            logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+            # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
             r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
         elif optioncode == 43:
             if hexvalue == True:
-                logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+                # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
             elif hexvalue == False:
-                logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+                # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
         r = []
@@ -483,13 +496,17 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
 
 
 def validatenetwork(address, cidr, count):
+    '''
+    Look for /32 networks
+    '''
     if cidr == '32':
         logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
-        report = 'DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count)
+        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address + '/' + cidr , str(count) ]
     else:
-        report = ''
+        report = []
     
-    return [ report ]
+    return report
+
 
 def member_leases(xmlobject):
     '''
@@ -513,31 +530,67 @@ def writeheaders():
     return
 
 
+def output_to_excel(dict_of_dataframes, title='Report', filename='temp.xlsx'):
+    '''
+    Output a set of DataFrames to Excel
+    '''
+    filename = title + '_' + filename
+
+    # Create Excel Writer using xlsxwriter as the engine
+    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    
+    # Create Excel Sheets
+    for name in dict_of_dataframes:
+        if not dict_of_dataframes[name].empty:
+            dict_of_dataframes[name].to_excel(writer, sheet_name=name)
+        else:
+            err = [ 'Not data for ' + name ]
+            df = pd.DataFrame(err)
+            df.to_excel(writer, sheet_name=name)
+            logging.error(f'DataFrame {name} emppty: {dict_of_dataframes[name]}')
+
+    # Save Excel
+    writer.save()
+
+    return
+
+
 def report_processed(report, REPORT_CONFIG, DBOBJECTS):
     '''
     Generate and Output report for processed content
     '''
-    for obj in report['processed'].keys():
-        if DBOBJECTS.header(obj):
-            labels = DBOBJECTS.header(obj).split(',')
-        else:
-            labels = []
-        print(DBOBJECTS.obj_type(obj))
-        df = pd.DataFrame(report['processed'][obj], columns=labels)
-        pprint.pprint(df)
+    report_dfs = collections.defaultdict(pd.DataFrame)
+    if len(report['processed'].keys()):
+        for obj in report['processed'].keys():
+            if DBOBJECTS.header(obj):
+                labels = DBOBJECTS.header(obj).split(',')
+            else:
+                labels = []
+            # Generate Dataframes(DBOBJECTS.obj_type(obj))
+            try:
+                otype = DBOBJECTS.obj_type(obj)
+                logging.info(f'Generating dataframe for processed object: {obj}, type: {otype}')
+                report_dfs[otype] = pd.DataFrame(report['processed'][obj], columns=labels)
+            except:
+                logging.error('{}: {}, {}'.format(obj, report['processed'][obj], labels))
+            # pprint.pprint(df)
+    else:
+        logging.info('No data for processed objects')
 
-    return
+    return report_dfs
 
 
 def report_collected(report, REPORT_CONFIG, DBOBJECTS):
     '''
     Generate and Output report for collected content
     '''
+    report_dfs = collections.defaultdict(pd.DataFrame)
     for obj in report['collected'].keys():
-        print(DBOBJECTS.obj_type(obj))
-        df = pd.DataFrame(report['collected'][obj])
-        pprint.pprint(df)
-    return
+        # print(DBOBJECTS.obj_type(obj))
+        report_dfs[DBOBJECTS.obj_type(obj)] = pd.DataFrame(report['collected'][obj])
+        # pprint.pprint(df)
+    
+    return report_dfs
 
 
 def report_counters(report, REPORT_CONFIG, DBOBJECTS):
@@ -545,4 +598,6 @@ def report_counters(report, REPORT_CONFIG, DBOBJECTS):
     Report Counters
     '''
     for counter in report.keys():
-        print(report['counter'])
+        pprint.pprint(report['counters'])
+    
+    return
