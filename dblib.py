@@ -1,4 +1,3 @@
-
 #!/usr/local/bin/python3
 '''
 ------------------------------------------------------------------------
@@ -37,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.4.9'
+__version__ = '0.5.0'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -78,8 +77,14 @@ class DBCONFIG():
 
         return
 
+
+    def version(self):
+        return self.config['version']
+
+
     def keys(self):
         return self.config.keys()
+
 
     def objects(self):
         return self.config['objects'].keys()
@@ -249,6 +254,11 @@ class REPORT_CONFIG():
             raise FileNotFoundError('YAML object file "{}" not found.'.format(cfg_file))
 
         return
+
+
+    def version(self):
+        return self.config['version']
+
 
     def report_sections(self):
         return self.config['report_sections']
