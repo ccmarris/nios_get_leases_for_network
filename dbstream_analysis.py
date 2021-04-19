@@ -5,23 +5,10 @@
    Python script to search for feature gaps between NIOS and BloxOne DDI
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
- Author: John Neerdael
- Date Last Updated: 20210305
- Changelog:
- - 0.1.0: Created new definitions to allow support for more objects and moved logfile to a CSV file
- - 0.2.0: Added support for /32 networks
- - 0.2.1: Test with lxml as XML parser for increased speed and performance
- - 0.2.2: Clean-up old code snippets
- - 0.2.3: Added demo code for using iterparse instead of parse (stream vs load database to memory)
- - 0.3.0: Forked to seperate version for testing iterparse
- - 0.3.1: Merged fork from Chris, added debug flag, added networkcontainer support, optimized for loop with break
- - 0.3.2: Minor update (sanitized checkparentobject)
- - 0.3.3: Add dhcp lease counting
 
- ToDo:
- - Add support for lease counting per member
- - Add support for DDNS domain config
- - Add support for ini file
+ Author: John Neerdael
+
+ Date Last Updated: 20210305
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -46,10 +33,11 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.3.3'
+__version__ = '0.3.5'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
+import dblib
 import argparse, tarfile, logging, re, time, sys, tqdm
 import collections
 from itertools import (takewhile,repeat)
@@ -98,6 +86,10 @@ def processnetwork(xmlobject):
 
 
 def validateobject(xmlobject):
+    '''
+    Validate object type
+    '''
+  
     object = ''
     for property in xmlobject:
         if property.attrib['NAME'] == '__type' and property.attrib['VALUE'] == '.com.infoblox.dns.option':

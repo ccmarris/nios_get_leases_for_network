@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis report configuration file
-# Version 0.0.1
+version: 0.0.2
 # Last updated: 20210406
 # Author: Chris Marrison
 report_sections:

@@ -1,0 +1,350 @@
+---
+# NIOS onedb analysis configuration file
+# Version 0.2.6
+# Last updated: 20210401
+# Author: Chris Marrison
+
+# Incompatible DHCP Options
+incompatible_options:
+  - 12
+  - 58
+  - 59
+  - 124
+  - 146
+  - 156
+  - 159
+  - 212 
+
+# DHCP Options that need further validation
+validate_options:
+  - 43
+  - 151
+  - 160
+
+# Previously Checked DHCP Options
+legacy_option_checks:
+  - 125
+
+# List of objects and parameters
+objects:
+  #Template object
+  object:
+      type: obj_type
+      header: header
+      actions:
+        - process
+        - collect
+        - count
+        - feature
+        - member
+      func: proc_obj
+      properties:
+        - list
+        - of
+        - properties
+      keypair:
+        - property_name
+        - expected_value
+      report:
+        - se
+        - pm
+
+  # Grid
+  .com.infoblox.one.cluster:
+    type: Grid
+    actions:
+      - collect
+    properties:
+      - name
+      - virtual_node_count
+      - physical_node_count
+      - heka_opt_in
+      - enable_wins_forwarding
+      - enable_extended_discovery
+    reports:
+      - pm
+
+  # Nodes
+  .com.infoblox.one.virtual_node:
+      type: Member
+      actions:
+        - collect
+      properties:
+        - member_type
+        - virtual_oid
+        - host_name
+
+  # Cluster DHCP Config
+  .com.infoblox.dns.cluster_dhcp_properties:
+      type: Grid DHCP Settings
+      actions:
+        - collect
+      properties:
+        - dns_update_style
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - deny_bootp
+
+  # Member DHCP Config
+  .com.infoblox.dns.member_dhcp_properties:
+      type: Member DHCP Settings
+      actions:
+        - collect
+        - feature
+      feature: DHCPv6
+      keypair:
+        - v6_service_enable
+        - 'true'
+      properties:
+        - dns_update_style
+        - enable_cisco_ise_dhcpd_lease_publishing
+        - enable_gss_tsig
+        - use_gss_tsig_keys
+        - v6_enable_gss_tsig
+        - enable_expert_mode
+        - enable_ifmap
+        - enable_roaming_hosts
+        - ping_number
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - deny_bootp
+        - pxe_lease_time_enabled
+        - overload_bootp
+        - recycle_leases
+        - service_enabled
+        - v6_service_enable
+        - virtual_node
+
+  # Cluster DNS Config
+  .com.infoblox.dns.cluster_dns_properties:
+      type: Grid DNS Settings
+      actions:
+        - collect
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_gss_tsig
+        - v6_enable_gss_tsig
+        - enable_dns64
+        - blacklist_enabled
+
+  # Member DNS Config
+  .com.infoblox.dns.member_dns_properties:
+      type: Member DNS Properties
+      actions:
+        - collect
+      properties:
+        - dns_health_check_enabled
+        - allow_gss_tsig_zone_updates
+        - enable_dns64
+        - enable_gss_tsig
+        - log_queries
+        - service_enabled
+        - virtual_node
+
+  # DHCP Options
+  .com.infoblox.dns.option:
+      type: dhcpoption
+      header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE,OBJECTLINE
+      actions:
+        - process
+      func: processdhcpoption
+
+  # IPv4 Networks 
+  .com.infoblox.dns.network:
+      type: dhcpnetwork
+      header: HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE
+      actions:
+        - count
+        - process
+        - collect
+      properties:
+        - address
+        - cidr
+        - override_boot_server
+        - override_boot_file
+        - override_next_server
+        - boot_server
+        - boot_file
+        - next_server
+        - pxe_lease_time_enabled
+        - deny_bootp
+      func: process_network
+  
+  # IPv6 Networks
+  .com.infoblox.dhcp.ipv6.networks:
+      type: ipv6network
+      actions:
+        - count
+        - feature
+
+  # DHCP leases
+  .com.infoblox.dns.lease:
+      type: dhcplease
+      header: HEADER-LEASECOUNT,MEMBER,ACTIVELEASES
+      actions:
+        - count
+        - member
+        # - collect
+      func: member_leases
+      properties:
+        - binding_state
+        - vnode_id
+
+  # Zones
+  .com.infoblox.dns.zone:
+        type: DNS Zones
+        actions:
+            - count
+            - collect
+        func: process_zone
+        properties:
+            - name
+            - display_name
+            - fqdn
+            - view_key
+            - zone_type
+            - primary_type
+            - parent
+            - is_multimaster
+            - is_external_primary
+            - assigned_ns_group
+
+
+  # DTC
+  .com.infoblox.dns.dtc:
+        type: DTC
+        actions:
+            - feature
+
+  # Captive Portal
+  .com.infoblox.dns.member_dhcp_captive_portal:
+        type: Captive Portal
+        actions:
+            - feature
+
+  # Blocklist
+  .com.infoblox.analytics.active_blacklist_rpz:
+      type: blacklist
+      actions:
+        - count
+        
+  
+  # Outbound API
+  .com.infoblox.one.endpoint:
+    type: Outbound API
+    actions:
+      - collect
+    properties:
+      - disabled
+      - type
+
+  .com.infoblox.one.endpoint_restapi:
+    type: Outbound API
+    actions:
+      - collect
+    properties:
+      - vendor_identifier
+
+  .com.infoblox.one.template_restapi:
+    type: Outbound API Endpoint
+    actions:
+      - feature
+      - collect
+    keypair:
+      - outbound_type
+      - REST
+    properties:
+      - name
+      - outbound_type
+      - template_type
+      - vendor_identifier
+      - event_type_list
+  
+  # Data Connector
+  .com.infoblox.one.datacollector_cluster:
+    type: Data Connector
+    actions:
+      - collect
+    properties:
+      - enable_registration
+
+  # DNS Records Types
+  .com.infoblox.dns.bind_a:
+    type: A Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_aaaa:
+    type: AAAA Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_cname:
+    type: CNAME Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_dnskey:
+    type: DNSKEY Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_mx:
+    type: MX Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ns:
+    type: NS Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3:
+    type: NSEC3 Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_nsec3param:
+    type: NSEC3PARAM Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_ptr:
+    type: PTR Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_rrsig:
+    type: RRSIG Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_soa:
+    type: SOA Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_srv:
+    type: SRV Records
+    actions:
+      - count
+
+  .com.infoblox.dns.bind_txt:
+    type: TXT Records
+    actions:
+      - count
