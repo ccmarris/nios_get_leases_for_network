@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -300,10 +300,34 @@ def process_object(xmlobject, collect_properties):
             obj_value = property.attrib['VALUE']
         if property.attrib['NAME'] in collect_properties:
             collected_data[property.attrib['NAME']] = property.attrib['VALUE'] 
+
     return collected_data
 
 
-def dump_object(xmlobject):
+def dump_object(db_obj, xmlfile):
+    '''
+    Dump first instance of specified object
+
+    Parameters:
+        one_db_obj (str): OneDB Object Type
+    
+    '''
+    found = False
+    context = etree.iterparse(xmlfile, events=('start','end'))
+    for event, elem in context:
+        if event == 'start' and elem.tag == 'OBJECT':
+            obj_value = get_object_value(elem)
+            if obj_value == db_obj:
+                output_object(elem)
+                found = True
+                break
+    if not found:
+        print('Object: {} not found in db'.format(db_obj))
+
+    return found
+
+
+def output_object(xmlobject):
     '''
     Generic Object Capture
 
