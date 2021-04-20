@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.0'
+__version__ = '0.5.1'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -169,29 +169,6 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
     return report
 
 
-def dump_object(db_obj, xmlfile):
-    '''
-    Dump first instance of specified object
-
-    Parameters:
-        one_db_obj (str): OneDB Object Type
-    
-    '''
-    found = False
-    context = etree.iterparse(xmlfile, events=('start','end'))
-    for event, elem in context:
-        if event == 'start' and elem.tag == 'OBJECT':
-            obj_value = dblib.get_object_value(elem)
-            if obj_value == db_obj:
-                dblib.dump_object(elem)
-                found = True
-                break
-    if not found:
-        print('Object: {} not found in db'.format(db_obj))
-
-    return
-
-
 def output_reports(report, outfile):
     '''
     Generate and output reports
@@ -243,36 +220,76 @@ def writeheaders():
 
 def process_backup(database, outfile, silent_mode=False, dump_obj=None):
     '''
-    Process Backup File
+    Determine whether backup File or XML
+
+    Parameters:
+        database (str): Filename
+        outfile (str): postfix for output files
+        silent_mode (bool): Do not log to console
+        dump_obj(bool): Dump object from database
     '''
+    status = False
     t = time.perf_counter()
 
-    # Extract db from backup
-    logging.info('EXTRACTING DATABASE FROM BACKUP')
+    if tarfile.is_tarfile(database):
+        # Extract db from backup
+        logging.info('EXTRACTING DATABASE FROM BACKUP')
+        with tarfile.open(database, "r:gz") as tar:
+            xmlfile = tar.extractfile('onedb.xml')
+            status = process_file(xmlfile, 
+                                  outfile,
+                                  silent_mode=silent_mode, 
+                                  dump_obj=dump_obj)
 
-    with tarfile.open(database, "r:gz") as tar:
-        xmlfile = tar.extractfile('onedb.xml')
-        if not dump_obj:
-            t2 = time.perf_counter() - t
-            logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
+        t2 = time.perf_counter() - t
+        logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
+    else:
+        # Assume onedb.xml
+        logging.info('ATTEMPTING TO PROCESS AS onedb.xml')
+        with open(database, 'rb') as xmlfile:
+            status = process_file(xmlfile, 
+                                  outfile,
+                                  silent_mode=silent_mode, 
+                                  dump_obj=dump_obj)
 
-            iterations = dblib.rawincount(xmlfile)
-            xmlfile.seek(0)
-            t3 = time.perf_counter() - t2
+    return status
 
-            logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
-            writeheaders()
 
-            # searchrootobjects(xmlfile, iterations)
-            db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
-            output_reports(db_report, outfile)
+def process_file(xmlfile, outfile, silent_mode=False, dump_obj=False):
+    '''
+    Process file
 
-            t4 = time.perf_counter() - t
-            logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
-        else:
-            dump_object(dump_obj, xmlfile)
-    
-    return
+    Parameters:
+        xmlfile (file): file handler
+        outfile (str): postfix for output files
+        silent_mode (bool): Do not log to console
+        dump_obj(bool): Dump object from database
+    '''
+    status = False
+
+    if not dump_obj:
+
+        iterations = dblib.rawincount(xmlfile)
+        xmlfile.seek(0)
+        t3 = time.perf_counter() - t2
+
+        logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
+        writeheaders()
+
+        # searchrootobjects(xmlfile, iterations)
+        db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
+        output_reports(db_report, outfile)
+
+        t4 = time.perf_counter() - t
+        logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
+        status = True
+
+    else:
+        if dblib.dump_object(dump_obj, xmlfile):
+            status = True
+
+    return status
+
 
 def main():
     '''
@@ -283,13 +300,14 @@ def main():
     options = parseargs()
     database = options.database
 
-    # Set up logging
+    # Set up logging & reporting
     # log events to the log file and to stdout
-    dateTime=time.strftime("%H%M%S-%d%m%Y")
+    # dateTime=time.strftime("%H%M%S-%d%m%Y")
+    dateTime = time.strftime('%Y%m%d-%H%M%S')
     if options.customer:
         outfile = f'{options.customer}-{dateTime}.xlsx'
     else:
-        outfile = f'{dateTime}.xlsx'
+        outfile = f'-{dateTime}.xlsx'
     logfile = f'{dateTime}.log'
     file_handler = logging.FileHandler(filename=logfile)
     stdout_handler = logging.StreamHandler(sys.stdout)
@@ -310,6 +328,7 @@ def main():
             handlers=handlers
             )
 
+    # Check run mode
     if options.version:
        v = report_versions()
        pprint.pprint(v)
