@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210419
+ Date Last Updated: 20210422
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -525,6 +525,7 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
         r = []
     
     validation = r
+    logging.debug(f'{validation}')
     
     return validation
 
@@ -534,8 +535,8 @@ def validatenetwork(address, cidr, count):
     Look for /32 networks
     '''
     if cidr == '32':
-        logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
         report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address + '/' + cidr , str(count) ]
+        logging.debug(f'{report}')
     else:
         report = []
     
@@ -571,20 +572,27 @@ def output_to_excel(dict_of_dataframes, title='Report', filename='temp.xlsx'):
     filename = title + '_' + filename
 
     # Create Excel Writer using xlsxwriter as the engine
-    writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+    try:
+        writer = pd.ExcelWriter(filename, engine='xlsxwriter')
+        logging.info(f'Creating excel file: {filename}')
     
-    # Create Excel Sheets
-    for name in dict_of_dataframes:
-        if not dict_of_dataframes[name].empty:
-            dict_of_dataframes[name].to_excel(writer, sheet_name=name)
-        else:
-            err = [ 'Not data for ' + name ]
-            df = pd.DataFrame(err)
-            df.to_excel(writer, sheet_name=name)
-            logging.error(f'DataFrame {name} emppty: {dict_of_dataframes[name]}')
+        # Create Excel Sheets
+        for name in dict_of_dataframes:
+            if not dict_of_dataframes[name].empty:
+                logging.info(f'+ Creating sheet {name}')
+                dict_of_dataframes[name].to_excel(writer, sheet_name=name)
+            else:
+                err = [ 'Not data for ' + name ]
+                df = pd.DataFrame(err)
+                df.to_excel(writer, sheet_name=name)
+                logging.error(f'DataFrame {name} empty: {dict_of_dataframes[name]}')
 
-    # Save Excel
-    writer.save()
+        # Save Excel
+        writer.save()
+        logging.info(f'Saved excel file: {filename}')
+
+    except:
+        logging.error(f'Failed to create excel file: {filename}')
 
     return
 
@@ -594,8 +602,8 @@ def report_processed(report, REPORT_CONFIG, DBOBJECTS):
     Generate and Output report for processed content
     '''
     report_dfs = collections.defaultdict(pd.DataFrame)
-    if len(report['processed'].keys()):
-        for obj in report['processed'].keys():
+    if len(report.keys()):
+        for obj in report.keys():
             if DBOBJECTS.header(obj):
                 labels = DBOBJECTS.header(obj).split(',')
             else:
@@ -619,10 +627,9 @@ def report_collected(report, REPORT_CONFIG, DBOBJECTS):
     Generate and Output report for collected content
     '''
     report_dfs = collections.defaultdict(pd.DataFrame)
-    for obj in report['collected'].keys():
-        # print(DBOBJECTS.obj_type(obj))
-        report_dfs[DBOBJECTS.obj_type(obj)] = pd.DataFrame(report['collected'][obj])
-        # pprint.pprint(df)
+    for obj in report.keys():
+        logging.info(f'Generating dataframe for collected data for object: {obj}')
+        report_dfs[DBOBJECTS.obj_type(obj)] = pd.DataFrame(report[obj])
     
     return report_dfs
 
@@ -631,7 +638,30 @@ def report_counters(report, REPORT_CONFIG, DBOBJECTS):
     '''
     Report Counters
     '''
-    for counter in report.keys():
-        pprint.pprint(report['counters'])
+    logging.info(f'Generating dataframe for object counters')
+    report_df = pd.DataFrame(report.most_common(), columns=['Object', 'Count'])
     
-    return
+    return report_df
+
+
+def report_mcounters(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Report Counters
+    '''
+    report_dfs = collections.defaultdict(pd.DataFrame)
+    logging.info(f'Generating dataframe for Member counters')
+    for obj in report.keys():
+        report_dfs[DBOBJECTS.obj_type(obj)] = pd.DataFrame(report[obj].most_common(), 
+                                                            columns=['Member', 'Count'])
+    
+    return report_dfs
+
+
+def report_features(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Report Counters
+    '''
+    logging.info(f'Generating dataframe for features')
+    report_df = pd.DataFrame(report, columns=['Feature', 'Enabled'])
+    
+    return report_df
