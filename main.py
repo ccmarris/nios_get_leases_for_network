@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.3'
+__version__ = '0.5.4'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -142,10 +142,10 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
                             elif action == 'member':
                                 process_object = getattr(dblib, OBJECTS.func(obj_value))
                                 if obj_type not in report['member_counts'].keys():
-                                    report['member_counts'][obj_value] = collections.Counter()
+                                    report['member_counts'][obj_type] = collections.Counter()
                                 member = process_object(elem)
                                 if member:
-                                    report['member_counts'][obj_value][member] += 1
+                                    report['member_counts'][obj_type][member] += 1
                                     
                             # Action Not Implemented
                             else:
@@ -194,7 +194,7 @@ def output_reports(report, outfile):
                 report_dataframes['processed'] = dblib.report_processed(report['processed'], 
                                                                         REPORT_CONFIG, 
                                                                         OBJECTS)
-                dblib.output_to_excel(report_dataframes['collected'],
+                dblib.output_to_excel(report_dataframes['processed'],
                                       title='Processed_Objects', 
                                       filename=outfile)
 
@@ -205,20 +205,27 @@ def output_reports(report, outfile):
                 report_dataframes['counters'] = dblib.report_counters(report['counters'], 
                                                                       REPORT_CONFIG, 
                                                                       OBJECTS)
-                pprint.pprint(report_dataframes['counters'])
 
             elif section == 'member_counts':
                 logging.info('Generating dataframes for member counters')
                 report_dataframes['member_counts'] = dblib.report_mcounters(report['member_counts'], 
                                                                       REPORT_CONFIG, 
                                                                       OBJECTS)
-                pprint.pprint(report_dataframes['member_counts'])
 
             elif section == 'features':
                 logging.info('Generating dataframes for features enabled')
                 report_dataframes['features'] = dblib.report_features(report['features'],
                                                                       REPORT_CONFIG,
                                                                       OBJECTS)
+
+        elif section == 'summary':
+            summary_report = dblib.generate_summary(report_dataframes,
+                                                    REPORT_CONFIG,
+                                                    OBJECTS)
+            dblib.output_to_excel(summary_report,
+                                    title='Summary_Report',
+                                    filename=outfile)
+
         else:
             logging.error(f'Report {section} not implemented')
             print(f'Report {section} not implemented')
@@ -227,7 +234,11 @@ def output_reports(report, outfile):
     return
 
 
-def process_backup(database, outfile, silent_mode=False, dump_obj=None):
+def process_backup(database, 
+                   outfile, 
+                   silent_mode=False, 
+                   dump_obj=None,
+                   logfile=''):
     '''
     Determine whether backup File or XML
 
@@ -260,12 +271,17 @@ def process_backup(database, outfile, silent_mode=False, dump_obj=None):
             status = process_file(xmlfile, 
                                   outfile,
                                   silent_mode=silent_mode, 
-                                  dump_obj=dump_obj)
+                                  dump_obj=dump_obj,
+                                  logfile=logfile)
 
     return status
 
 
-def process_file(xmlfile, outfile, silent_mode=False, dump_obj=False, t=time.perf_counter()):
+def process_file(xmlfile, outfile, 
+                 silent_mode=False, 
+                 dump_obj=False, 
+                 logfile='',
+                 t=time.perf_counter()):
     '''
     Process file
 
@@ -342,7 +358,10 @@ def main():
        v = report_versions()
        pprint.pprint(v)
     else:
-       process_backup(database, outfile, silent_mode=options.silent, dump_obj=options.dump)
+       process_backup(database, outfile, 
+                      silent_mode=options.silent, 
+                      dump_obj=options.dump,
+                      logfile=logfile)
 
     return exitcode
 
