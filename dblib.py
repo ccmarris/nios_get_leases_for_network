@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.2'
+__version__ = '0.5.4'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -262,6 +262,18 @@ class REPORT_CONFIG():
 
     def report_sections(self):
         return self.config['report_sections']
+    
+
+    def summary_items(self):
+        return self.config['summary_items']
+
+
+    def summary_keys(self, item):
+        return self.config['summary_items'][item]['keys']
+
+
+    def summary_name(self, item):
+        return self.config['summary_items'][item]['name']
   
 
 # *** Functions ***
@@ -612,9 +624,9 @@ def report_processed(report, REPORT_CONFIG, DBOBJECTS):
             try:
                 otype = DBOBJECTS.obj_type(obj)
                 logging.info(f'Generating dataframe for processed object: {obj}, type: {otype}')
-                report_dfs[otype] = pd.DataFrame(report['processed'][obj], columns=labels)
+                report_dfs[otype] = pd.DataFrame(report[obj], columns=labels)
             except:
-                logging.error('{}: {}, {}'.format(obj, report['processed'][obj], labels))
+                logging.error('{}: {}, {}'.format(obj, report[obj], labels))
             # pprint.pprint(df)
     else:
         logging.info('No data for processed objects')
@@ -651,8 +663,8 @@ def report_mcounters(report, REPORT_CONFIG, DBOBJECTS):
     report_dfs = collections.defaultdict(pd.DataFrame)
     logging.info(f'Generating dataframe for Member counters')
     for obj in report.keys():
-        report_dfs[DBOBJECTS.obj_type(obj)] = pd.DataFrame(report[obj].most_common(), 
-                                                            columns=['Member', 'Count'])
+        report_dfs[obj] = pd.DataFrame(report[obj].most_common(), 
+                                       columns=['Member', 'Count'])
     
     return report_dfs
 
@@ -665,3 +677,34 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     report_df = pd.DataFrame(report, columns=['Feature', 'Enabled'])
     
     return report_df
+
+
+def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Generate Dict of Dataframes For Summary Report
+    '''
+    summary_report = collections.defaultdict()
+
+    if 'processed' in report.keys():
+       for item in REPORT_CONFIG.summary_items():
+            logging.info(f'Checking dataframe summary for {item}')
+            if not report['processed'][item].empty:
+                logging.info(f'Generating summary for {item}')
+                summary_report[REPORT_CONFIG.summary_name(item)] = report['processed'][item].value_counts(REPORT_CONFIG.summary_keys(item)) 
+            else:
+                logging.warning(f'Dataframe for {item} reports as empty')
+
+    if 'counters' in report.keys():
+        summary_report['Object_Counters'] = report['counters']
+    
+    if 'member_counts' in report.keys():
+        for obj in report['member_counts'].keys():
+            sheet_name = 'Member_Count_' + str(obj)
+            summary_report[sheet_name] = report['member_counts'][obj]
+    
+    if 'features' in report.keys():
+        summary_report['Features'] = report['features']
+
+
+    
+    return summary_report
