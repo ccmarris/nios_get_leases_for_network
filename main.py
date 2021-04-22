@@ -6,9 +6,9 @@
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
 
- Author: John Neerdael
+ Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210419
+ Date Last Updated: 20210422
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.1'
+__version__ = '0.5.3'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -175,46 +175,55 @@ def output_reports(report, outfile):
     '''
     OBJECTS = dblib.DBCONFIG()
     REPORT_CONFIG = dblib.REPORT_CONFIG()
+    report_dataframes = {}
+    summary_report = {}
 
     for section in REPORT_CONFIG.report_sections():
         if section in report.keys():
             if section == 'collected':
-                collected_dfs = dblib.report_collected(report, REPORT_CONFIG, OBJECTS)
-                dblib.output_to_excel(collected_dfs, title='Collected_Properties', filename=outfile)
+                logging.info('Generating dataframes for collected objects')
+                report_dataframes['collected'] = dblib.report_collected(report['collected'], 
+                                                                        REPORT_CONFIG, 
+                                                                        OBJECTS)
+                dblib.output_to_excel(report_dataframes['collected'], 
+                                      title='Collected_Properties', 
+                                      filename=outfile)
+
             elif section == 'processed':
-                processed_dfs = dblib.report_processed(report, REPORT_CONFIG, OBJECTS)
-                dblib.output_to_excel(processed_dfs, title='Processed_Objects', filename=outfile)
+                logging.info('Generating dataframes for processed objects')
+                report_dataframes['processed'] = dblib.report_processed(report['processed'], 
+                                                                        REPORT_CONFIG, 
+                                                                        OBJECTS)
+                dblib.output_to_excel(report_dataframes['collected'],
+                                      title='Processed_Objects', 
+                                      filename=outfile)
+
             elif section == 'counters':
                 # counters_dfs = dblib.report_counters(report, REPORT_CONFIG, OBJECTS)
                 # pprint.pprint(counters_dfs)
-                dblib.report_counters(report, REPORT_CONFIG, OBJECTS)
+                logging.info('Generating dataframes for object counters')
+                report_dataframes['counters'] = dblib.report_counters(report['counters'], 
+                                                                      REPORT_CONFIG, 
+                                                                      OBJECTS)
+                pprint.pprint(report_dataframes['counters'])
+
             elif section == 'member_counts':
-                # mcounters_dfs = dblib.report_counters(counters_dfs, REPORT_CONFIG, OBJECTS)
-                # pprint.pprint(mcounters_dfs
-                pprint.pprint(report['member_counts'])
+                logging.info('Generating dataframes for member counters')
+                report_dataframes['member_counts'] = dblib.report_mcounters(report['member_counts'], 
+                                                                      REPORT_CONFIG, 
+                                                                      OBJECTS)
+                pprint.pprint(report_dataframes['member_counts'])
+
             elif section == 'features':
-                pprint.pprint(report['features'])
+                logging.info('Generating dataframes for features enabled')
+                report_dataframes['features'] = dblib.report_features(report['features'],
+                                                                      REPORT_CONFIG,
+                                                                      OBJECTS)
         else:
-            logging.error('Report {} not implemented'.format(section))
-            print('Report {} not implemented'.format(section))
+            logging.error(f'Report {section} not implemented')
+            print(f'Report {section} not implemented')
 
 
-    '''
-    logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-    logging.info('DHCPNETWORK,INCOMPATIBLE,' + address + '/' + cidr + ',' + str(count))
-    logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
-    '''
-
-    return
-
-
-def writeheaders():
-    logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
-    logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE')
-    logging.info('HEADER-LEASECOUNT,MEMBER,ACTIVELEASES')
     return
 
 
@@ -239,13 +248,14 @@ def process_backup(database, outfile, silent_mode=False, dump_obj=None):
             status = process_file(xmlfile, 
                                   outfile,
                                   silent_mode=silent_mode, 
-                                  dump_obj=dump_obj)
+                                  dump_obj=dump_obj,
+                                  t=t)
 
         t2 = time.perf_counter() - t
         logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
     else:
         # Assume onedb.xml
-        logging.info('ATTEMPTING TO PROCESS AS onedb.xml')
+        logging.info('NOT BACKUP FILE ATTEMPTING TO PROCESS AS onedb.xml')
         with open(database, 'rb') as xmlfile:
             status = process_file(xmlfile, 
                                   outfile,
@@ -255,7 +265,7 @@ def process_backup(database, outfile, silent_mode=False, dump_obj=None):
     return status
 
 
-def process_file(xmlfile, outfile, silent_mode=False, dump_obj=False):
+def process_file(xmlfile, outfile, silent_mode=False, dump_obj=False, t=time.perf_counter()):
     '''
     Process file
 
@@ -268,13 +278,12 @@ def process_file(xmlfile, outfile, silent_mode=False, dump_obj=False):
     status = False
 
     if not dump_obj:
-
+        t2 = time.perf_counter() - t
         iterations = dblib.rawincount(xmlfile)
         xmlfile.seek(0)
         t3 = time.perf_counter() - t2
 
         logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
-        writeheaders()
 
         # searchrootobjects(xmlfile, iterations)
         db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
