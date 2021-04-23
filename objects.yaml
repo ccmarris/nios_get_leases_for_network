@@ -38,6 +38,7 @@ objects:
         - feature
         - member
       func: proc_obj
+      feature: feature_desc
       properties:
         - list
         - of
@@ -191,6 +192,7 @@ objects:
       actions:
         - count
         - feature
+      feature: IPv6 Networks
 
   # DHCP leases
   .com.infoblox.dns.lease:
@@ -230,12 +232,14 @@ objects:
         type: DTC
         actions:
             - feature
+        feature: DTC
 
   # Captive Portal
   .com.infoblox.dns.member_dhcp_captive_portal:
         type: Captive Portal
         actions:
             - feature
+        feature: Captive_Portal
 
   # Blocklist
   .com.infoblox.analytics.active_blacklist_rpz:
@@ -265,6 +269,7 @@ objects:
     actions:
       - feature
       - collect
+    feature: Outbound_REST
     keypair:
       - outbound_type
       - REST

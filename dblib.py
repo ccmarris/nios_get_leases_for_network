@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210422
+ Date Last Updated: 20210424
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.4'
+__version__ = '0.5.5'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -663,9 +663,10 @@ def report_mcounters(report, REPORT_CONFIG, DBOBJECTS):
     report_dfs = collections.defaultdict(pd.DataFrame)
     logging.info(f'Generating dataframe for Member counters')
     for obj in report.keys():
+        logging.info(f'+ Creating dataframe for object: {obj}')
         report_dfs[obj] = pd.DataFrame(report[obj].most_common(), 
                                        columns=['Member', 'Count'])
-    
+        pprint.pprint(report_dfs[obj]) 
     return report_dfs
 
 
@@ -674,7 +675,7 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     Report Counters
     '''
     logging.info(f'Generating dataframe for features')
-    report_df = pd.DataFrame(report, columns=['Feature', 'Enabled'])
+    report_df = pd.DataFrame(report.items(), columns=['Feature', 'Enabled'])
     
     return report_df
 
@@ -686,13 +687,16 @@ def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
     summary_report = collections.defaultdict()
 
     if 'processed' in report.keys():
-       for item in REPORT_CONFIG.summary_items():
-            logging.info(f'Checking dataframe summary for {item}')
-            if not report['processed'][item].empty:
-                logging.info(f'Generating summary for {item}')
-                summary_report[REPORT_CONFIG.summary_name(item)] = report['processed'][item].value_counts(REPORT_CONFIG.summary_keys(item)) 
+       for item in report['processed'].keys():
+            if item in REPORT_CONFIG.summary_items():
+                logging.info(f'Checking dataframe summary for {item}')
+                if not report['processed'][item].empty:
+                    logging.info(f'Generating summary for {item}')
+                    summary_report[REPORT_CONFIG.summary_name(item)] = report['processed'][item].value_counts(REPORT_CONFIG.summary_keys(item)) 
+                else:
+                    logging.warning(f'Dataframe for {item} reports as empty')
             else:
-                logging.warning(f'Dataframe for {item} reports as empty')
+                logging.info(f'No summary report defined for processed object: {item}')
 
     if 'counters' in report.keys():
         summary_report['Object_Counters'] = report['counters']
@@ -704,7 +708,5 @@ def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
     
     if 'features' in report.keys():
         summary_report['Features'] = report['features']
-
-
     
     return summary_report
