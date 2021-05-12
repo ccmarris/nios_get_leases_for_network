@@ -8,7 +8,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210423
+ Date Last Updated: 20210511
 
  Copyright (c) 2021 John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.5'
+__version__ = '0.5.6'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -104,7 +104,8 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
                         for action in OBJECTS.actions(obj_value):
                             # Action Count
                             if action == 'count':
-                                object_counts[obj_value] += 1
+                                # Use friendly object name
+                                object_counts[obj_type] += 1
 
                             # Action Enabled
                             elif action == 'feature':
