@@ -8,9 +8,9 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210511
+ Date Last Updated: 20210512
 
- Copyright (c) 2021 John Neerdael / Infoblox
+ Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
  with or without modification, are permitted provided
  that the following conditions are met:
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.6'
+__version__ = '0.5.7'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'jneerdael@infoblox.com'
 
@@ -51,6 +51,7 @@ def parseargs():
     parser.add_argument('-d', '--database', action="store", help="Path to database file", default='database.bak')
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
     parser.add_argument('--dump', type=str, default='', help="Dump Object")
+    parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
@@ -239,6 +240,7 @@ def process_backup(database,
                    outfile, 
                    silent_mode=False, 
                    dump_obj=None,
+                   key_value=None,
                    logfile=''):
     '''
     Determine whether backup File or XML
@@ -248,6 +250,7 @@ def process_backup(database,
         outfile (str): postfix for output files
         silent_mode (bool): Do not log to console
         dump_obj(bool): Dump object from database
+        key_value(list): Key Value Pair to match using dump 
     '''
     status = False
     t = time.perf_counter()
@@ -261,6 +264,7 @@ def process_backup(database,
                                   outfile,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
+                                  key_value=key_value,
                                   t=t)
 
         t2 = time.perf_counter() - t
@@ -273,6 +277,7 @@ def process_backup(database,
                                   outfile,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
+                                  key_value=key_value,
                                   logfile=logfile)
 
     return status
@@ -281,6 +286,7 @@ def process_backup(database,
 def process_file(xmlfile, outfile, 
                  silent_mode=False, 
                  dump_obj=False, 
+                 key_value=None,
                  logfile='',
                  t=time.perf_counter()):
     '''
@@ -311,8 +317,12 @@ def process_file(xmlfile, outfile,
         status = True
 
     else:
-        if dblib.dump_object(dump_obj, xmlfile):
-            status = True
+        if key_value:
+            if dblib.dump_object(dump_obj, xmlfile, property=key_value[0], value=key_value[1]):
+                status = True
+        else:
+            if dblib.dump_object(dump_obj, xmlfile):
+                status = True
 
     return status
 
@@ -362,6 +372,7 @@ def main():
        process_backup(database, outfile, 
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
+                      key_value=options.key_value,
                       logfile=logfile)
 
     return exitcode
