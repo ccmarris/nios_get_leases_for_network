@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis report configuration file
-version: 0.0.6
-# Last updated: 20210406
+version: 0.0.7
+# Last updated: 20210511
 # Author: Chris Marrison
 report_sections:
   - processed
@@ -12,18 +12,19 @@ report_sections:
   - summary
 
 summary_items:
-  dhcpoption:
+  DHCP_Options:
     name: DHCP_Options
-    keys: 
+    keys:
       - STATUS
       - OPTIONSPACE
       - OPTIONCODE
-  dhcpnetwork:
+  Networks:
     name: IPAM_Networks
     keys:
       - STATUS
+      - CIDR
 
-
+# Currently Not used
 Incompatible Features:
   - DHCPv6:
       section: features

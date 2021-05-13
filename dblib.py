@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210424
+ Date Last Updated: 20210411
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.5'
+__version__ = '0.5.7'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -316,12 +316,15 @@ def process_object(xmlobject, collect_properties):
     return collected_data
 
 
-def dump_object(db_obj, xmlfile):
+def dump_object(db_obj, xmlfile, property='', value=''):
     '''
     Dump first instance of specified object
 
     Parameters:
         one_db_obj (str): OneDB Object Type
+        xmlfile (obj): File handler for XML file
+        property (str): match property
+        value (str): value property should match
     
     '''
     found = False
@@ -330,11 +333,22 @@ def dump_object(db_obj, xmlfile):
         if event == 'start' and elem.tag == 'OBJECT':
             obj_value = get_object_value(elem)
             if obj_value == db_obj:
-                output_object(elem)
-                found = True
-                break
+                if property:
+                    if check_feature(elem, key_name=property, expected_value=value):
+                        output_object(elem)
+                        found = True
+                        break
+                else:
+                    # Just match first object
+                    output_object(elem)
+                    found = True
+                    break
+                    
     if not found:
-        print('Object: {} not found in db'.format(db_obj))
+        if property:
+            print(f'Object: {db_obj} not found in db with key/value {property}/{value}')
+        else:
+            print(f'Object: {db_obj} not found in db')
 
     return found
 
@@ -523,16 +537,16 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
         # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
         r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     elif optioncode in validate_options:
-        if optioncode == 151:
-            # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
-            r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
-        elif optioncode == 43:
+        if optioncode == 43:
             if hexvalue == True:
                 # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
             elif hexvalue == False:
                 # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
+        else:
+            # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
+            r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
         r = []
     
@@ -547,7 +561,7 @@ def validatenetwork(address, cidr, count):
     Look for /32 networks
     '''
     if cidr == '32':
-        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address + '/' + cidr , str(count) ]
+        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address, '/' + cidr , str(count) ]
         logging.debug(f'{report}')
     else:
         report = []
@@ -692,7 +706,9 @@ def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
                 logging.info(f'Checking dataframe summary for {item}')
                 if not report['processed'][item].empty:
                     logging.info(f'Generating summary for {item}')
-                    summary_report[REPORT_CONFIG.summary_name(item)] = report['processed'][item].value_counts(REPORT_CONFIG.summary_keys(item)) 
+                    summary_report[REPORT_CONFIG.summary_name(item)] = \
+                        report['processed'][item].value_counts(
+                            REPORT_CONFIG.summary_keys(item)).reset_index(name='No of instances') 
                 else:
                     logging.warning(f'Dataframe for {item} reports as empty')
             else:
