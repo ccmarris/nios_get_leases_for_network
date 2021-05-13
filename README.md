@@ -23,6 +23,7 @@ Requires:
     - collections
     - lxml
     - yaml
+    - time
 
 Basic examples::
  

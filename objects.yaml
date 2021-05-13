@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.2.9
+version: 0.3.0
 # Last updated: 20210401
 # Author: Chris Marrison
 
@@ -234,6 +234,11 @@ objects:
       properties:
         - binding_state
         - vnode_id
+  
+  .com.infoblox.dns.fixed_address:
+      type: Fixed_Address
+      actions:
+        - count
 
   # Zones
   .com.infoblox.dns.zone:
