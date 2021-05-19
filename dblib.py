@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210411
+ Date Last Updated: 20210519
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,12 +36,13 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.7'
+__version__ = '0.6.0'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
 import tarfile, logging, re, time, sys, tqdm
 import os
+import configparser
 import collections
 import yaml
 import pandas as pd
@@ -218,7 +219,7 @@ class DBCONFIG():
         else:
             reports = None
         
-        return actions
+        return reports
 
 
     def incompatible_options(self):
@@ -277,6 +278,44 @@ class REPORT_CONFIG():
   
 
 # *** Functions ***
+
+def read_ini(ini_filename):
+    '''
+    Open and parse ini file
+
+    Parameters:
+        ini_filename (str): name of inifile
+
+    Returns:
+        config (dict): Dictionary of BloxOne configuration elements
+
+    '''
+    # Local Variables
+    cfg = configparser.ConfigParser()
+    config = {}
+    ini_keys = [ 'db_type', 'output_path', 'create_archive', 'dbobjects_config', 'report_config' ]
+
+    # Attempt to read api_key from ini file
+    try:
+        cfg.read(ini_filename)
+    except configparser.Error as err:
+        logging.error(err)
+
+    # Look for demo section
+    if 'DDI_Analysis' in cfg:
+        for key in ini_keys:
+            # Check for key in BloxOne section
+            if key in cfg['DDI_Analysis']:
+                config[key] = cfg['DDI_Analysis'][key].strip("'\"")
+                logging.debug('Key {} found in {}: {}'.format(key, ini_filename, config[key]))
+            else:
+                logging.warning('Key {} not found in B1DDI_demo section.'.format(key))
+                config[key] = ''
+    else:
+        logging.warning('No DDI_Analysis Section in config file: {}'.format(ini_filename))
+
+    return config
+
 
 def check_feature(xmlobject, key_name='enabled', expected_value='true'):
     '''
@@ -591,11 +630,19 @@ def writeheaders():
     return
 
 
-def output_to_excel(dict_of_dataframes, title='Report', filename='temp.xlsx'):
+def output_to_excel(dict_of_dataframes, 
+                    title='Report', 
+                    output_path=None,
+                    filename='temp.xlsx'):
     '''
     Output a set of DataFrames to Excel
     '''
-    filename = title + '_' + filename
+    if output_path:
+        filename = f'{output_path}{title}_{filename}'
+    else:
+        filename = f'{title}_{filename}'
+
+    logging.info(f'Ouput filename set to: {filename}')
 
     # Create Excel Writer using xlsxwriter as the engine
     try:
@@ -666,6 +713,7 @@ def report_counters(report, REPORT_CONFIG, DBOBJECTS):
     '''
     logging.info(f'Generating dataframe for object counters')
     report_df = pd.DataFrame(report.most_common(), columns=['Object', 'Count'])
+    logging.debug(report_df) 
     
     return report_df
 
@@ -680,7 +728,7 @@ def report_mcounters(report, REPORT_CONFIG, DBOBJECTS):
         logging.info(f'+ Creating dataframe for object: {obj}')
         report_dfs[obj] = pd.DataFrame(report[obj].most_common(), 
                                        columns=['Member', 'Count'])
-        pprint.pprint(report_dfs[obj]) 
+        logging.debug(report_dfs[obj]) 
     return report_dfs
 
 
@@ -690,6 +738,7 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     '''
     logging.info(f'Generating dataframe for features')
     report_df = pd.DataFrame(report.items(), columns=['Feature', 'Enabled'])
+    logging.debug(report_df)
     
     return report_df
 

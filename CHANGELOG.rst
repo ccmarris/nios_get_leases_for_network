@@ -1,4 +1,33 @@
 Changelog:
+    20210519 v0.6.0 Adding output path option
+    20210513 v0.5.8 Minor bug fix
+    20210513 v0.5.7 Minor updates to dhcpoption logic
+    20210512 v0.5.6 Added key/value matching to --dump
+    20210512 v0.5.6 Minor Changes to improve current summary report
+    20210509 v0.2.9 Added time module to README.rst
+    20210423 v0.5.5 Fixed Feature Summary Reporting, and corrected logic for processed items.
+    20210423 v0.5.4 local re-commit
+    20210423 v0.5.4 Added basic summary report
+    20210422 Captures minor changes
+    20210422 v0.5.3 Re-implementation of lost changes
+    20210422 v0.5.2 Counter Reports
+    20210420 v0.5.1 Restructured to handle tar.gz or direct xml file, updated timestamp.
+    20210419 v0.5.0 Restructured main and added version reporting
+    20210419 v0.4.9 Force Update
+    20210418 v0.4.8 Excel Reports for collected and processed data objects
+    20210410 v0.4.5 Outline for reporting
+    20210407 v0.4.5 Continue with restructure
+    20210301 v0.4.5 Added ability to Capture Generic Properties from object
+    20210330 v0.4.1 Added YAML config for reports, and dhcpoptions plus class
+    20210330 v0.4.0 Foundations of new structure
+    20210419 v0.4.9 Force Update
+    20210418 v0.4.8 Excel Reports for collected and processed data objects
+    20210410 v0.4.5 Outline for reporting
+    20210407 v0.4.5 Continue with restructure
+    20210301 v0.4.5 Added ability to Capture Generic Properties from object
+    20210330 v0.4.1 Added YAML config for reports, and dhcpoptions plus class
+    20210330 v0.4.0 Foundations of new structure
+
  - 0.3.3: Add dhcp lease counting
  - 0.3.2: Minor update (sanitized checkparentobject)
  - 0.3.1: Merged fork from Chris, added debug flag, added networkcontainer support, optimized for loop with break
