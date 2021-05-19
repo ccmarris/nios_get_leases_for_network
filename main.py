@@ -8,7 +8,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210512
+ Date Last Updated: 20210519
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,15 +33,16 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.5.7'
+__version__ = '0.6.0'
 __author__ = 'John Neerdael, Chris Marrison'
-__author_email__ = 'jneerdael@infoblox.com'
+__author_email__ = 'chris@infoblox.com'
 
 import dblib
-import argparse, tarfile, logging, re, time, sys, tqdm
+import argparse, tarfile, logging, time, sys, tqdm
+import os
 import collections
 import pprint
-from itertools import (takewhile,repeat)
+from itertools import (takewhile, repeat)
 from lxml import etree
 
 
@@ -50,6 +51,7 @@ def parseargs():
     parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility')
     parser.add_argument('-d', '--database', action="store", help="Path to database file", default='database.bak')
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
+    parser.add_argument('-p', '--output_path', action="store", default='', help="Output file path (optional)")
     parser.add_argument('--dump', type=str, default='', help="Dump Object")
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
@@ -171,7 +173,7 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
     return report
 
 
-def output_reports(report, outfile):
+def output_reports(report, outfile, output_path=None):
     '''
     Generate and output reports
     '''
@@ -189,6 +191,7 @@ def output_reports(report, outfile):
                                                                         OBJECTS)
                 dblib.output_to_excel(report_dataframes['collected'], 
                                       title='Collected_Properties', 
+                                      output_path=output_path,
                                       filename=outfile)
 
             elif section == 'processed':
@@ -198,11 +201,11 @@ def output_reports(report, outfile):
                                                                         OBJECTS)
                 dblib.output_to_excel(report_dataframes['processed'],
                                       title='Processed_Objects', 
+                                      output_path=output_path,
                                       filename=outfile)
 
             elif section == 'counters':
                 # counters_dfs = dblib.report_counters(report, REPORT_CONFIG, OBJECTS)
-                # pprint.pprint(counters_dfs)
                 logging.info('Generating dataframes for object counters')
                 report_dataframes['counters'] = dblib.report_counters(report['counters'], 
                                                                       REPORT_CONFIG, 
@@ -226,6 +229,7 @@ def output_reports(report, outfile):
                                                     OBJECTS)
             dblib.output_to_excel(summary_report,
                                     title='Summary_Report',
+                                    output_path=output_path,
                                     filename=outfile)
 
         else:
@@ -238,6 +242,7 @@ def output_reports(report, outfile):
 
 def process_backup(database, 
                    outfile, 
+                   output_path=None,
                    silent_mode=False, 
                    dump_obj=None,
                    key_value=None,
@@ -248,6 +253,7 @@ def process_backup(database,
     Parameters:
         database (str): Filename
         outfile (str): postfix for output files
+        output_path (str): Path for file output
         silent_mode (bool): Do not log to console
         dump_obj(bool): Dump object from database
         key_value(list): Key Value Pair to match using dump 
@@ -262,6 +268,7 @@ def process_backup(database,
             xmlfile = tar.extractfile('onedb.xml')
             status = process_file(xmlfile, 
                                   outfile,
+                                  output_path=output_path,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
                                   key_value=key_value,
@@ -275,6 +282,7 @@ def process_backup(database,
         with open(database, 'rb') as xmlfile:
             status = process_file(xmlfile, 
                                   outfile,
+                                  output_path=output_path,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
                                   key_value=key_value,
@@ -284,6 +292,7 @@ def process_backup(database,
 
 
 def process_file(xmlfile, outfile, 
+                 output_path=None,
                  silent_mode=False, 
                  dump_obj=False, 
                  key_value=None,
@@ -295,8 +304,14 @@ def process_file(xmlfile, outfile,
     Parameters:
         xmlfile (file): file handler
         outfile (str): postfix for output files
+        output_path (str): Path for file output
         silent_mode (bool): Do not log to console
         dump_obj(bool): Dump object from database
+        logfile (str): Logging filename
+        t (obj): time.perfcounter object
+    
+    Returns:
+        True or False 
     '''
     status = False
 
@@ -310,7 +325,7 @@ def process_file(xmlfile, outfile,
 
         # searchrootobjects(xmlfile, iterations)
         db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
-        output_reports(db_report, outfile)
+        output_reports(db_report, outfile, output_path=output_path)
 
         t4 = time.perf_counter() - t
         logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
@@ -340,17 +355,33 @@ def main():
     # log events to the log file and to stdout
     # dateTime=time.strftime("%H%M%S-%d%m%Y")
     dateTime = time.strftime('%Y%m%d-%H%M%S')
+
+    # Set output path if provided
+    if options.output_path:
+        if os.path.isdir(options.output_path):
+            output_path = f'{options.output_path}/'
+        else:
+            print(f'Specified output path {options.output_path} does not exit')
+            output_path = None
+    else:
+        output_path = None
+
+    # Set output file
     if options.customer:
         outfile = f'{options.customer}-{dateTime}.xlsx'
     else:
         outfile = f'-{dateTime}.xlsx'
-    logfile = f'{dateTime}.log'
+
+    # Set up logging
+    logfile = f'{output_path}{dateTime}.log'
     file_handler = logging.FileHandler(filename=logfile)
     stdout_handler = logging.StreamHandler(sys.stdout)
     # Output to CLI and config
     handlers = [file_handler, stdout_handler]
     # Output to config only
     filehandler = [file_handler]
+
+    # Check for silent mode
     if options.silent:
         logging.basicConfig(
             level=options.loglevel,
@@ -370,12 +401,14 @@ def main():
        pprint.pprint(v)
     else:
        process_backup(database, outfile, 
+                      output_path = output_path,
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
                       key_value=options.key_value,
                       logfile=logfile)
 
     return exitcode
+
 
 ### Main ###
 if __name__ == '__main__':

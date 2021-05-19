@@ -29,5 +29,7 @@ Basic examples::
  
     $ main.py –version
     $ main.py -d <backup_database> -c <customer_name> --silent
+    $ main.py -d <database> --dump <object>
+    $ main.py -d <database> --dump <object> --key_value <key> <value>
 
 
