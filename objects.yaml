@@ -1,8 +1,11 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.0
+version: 0.3.2
 # Last updated: 20210513
 # Author: Chris Marrison
+
+# Potential future use
+db_type: NIOS
 
 # Incompatible DHCP Options
 incompatible_options:
@@ -185,6 +188,22 @@ objects:
         - service_enabled
         - virtual_node
 
+  # NTP Service
+  .com.infoblox.one.vnode_time:
+    type: NTP Service
+    actions:
+        - collect
+        - feature
+    keypair:
+        - ntp_service_enabled
+        - true
+    properties:
+        - enable_authentication
+        - external_ntp_servers_enabled
+        - ntp_service_enabled
+        - time_zone
+        - virtual_node
+
   # DHCP Options
   .com.infoblox.dns.option:
       type: DHCP_Options
@@ -265,6 +284,29 @@ objects:
         actions:
             - feature
         feature: DTC
+
+  .com.infoblox.dns.idns_lbdn:
+    type: LBDN Record
+    actions:
+        - collect
+        - count
+    properties:
+      - name
+      - lb_method
+      - types
+      - persistence
+      - use_ttl
+
+  .com.infoblox.dns.idns_pool:
+    type: LBDN Pool
+    actions:
+      - collect
+    properties:
+      - alternate_method
+      - availability
+      - name
+      - preferred_method
+      - preferred_topology
 
   # Captive Portal
   .com.infoblox.dns.member_dhcp_captive_portal:

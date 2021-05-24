@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
