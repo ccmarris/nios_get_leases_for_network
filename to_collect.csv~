@@ -1,7 +1,0 @@
-GSS-TSIG configuration for DNS and DHCP (separately check)
-BOOTP settingsPXE settings (nextserverfilename), ping before assign, DDNS settings below the global level
-IPAM:  Cloud delegated objectsDNS zone associations, lease scavenging, ignore option list, update on renew (DDNS), PXE (+boot server), IPv4 filters, AD sites, (enable) discovery, ignore ID (MAC or client ID), vlan anything, DHCP forwarding, fixed address update (DDNS), IF-MAP
-Traffic Controlshared record groups, subscriber services, blacklist rulesets, DNS64 groups, query monitoring, dynamic update groups, DNSSEC, RPZ (anything), sort list, rrset ordering, DNS scavenging, hostname compliance, dynamic update patterns, DNS integrity check, port reservation, protect records
-ADMINISTRATION: Workflowcloud, authentication server groups
-GRID: HSM GroupMicrosoft Servers, Amazon, Ecosystem
-BFD templatesTFTP, HTTP, FTP, NTP, bloxTools, TAXII, Threat Protection, Subscriber Collection

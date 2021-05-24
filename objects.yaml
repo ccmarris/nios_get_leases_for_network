@@ -194,6 +194,7 @@ objects:
     actions:
         - collect
         - feature
+    feature: NTP Server
     keypair:
         - ntp_service_enabled
         - true
