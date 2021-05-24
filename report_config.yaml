@@ -1,8 +1,13 @@
 ---
 # NIOS onedb analysis report configuration file
-version: 0.0.8
+version: 0.0.9
 # Last updated: 20210513
 # Author: Chris Marrison
+
+# Report Output (future use)
+output_path: 
+zip_reports: False
+
 report_sections:
   - processed
   - collected
@@ -11,6 +16,7 @@ report_sections:
   - member_counts
   - summary
 
+# Define Keys for uniqueness matching in summary reports
 summary_items:
   DHCP_Options:
     name: DHCP_Options

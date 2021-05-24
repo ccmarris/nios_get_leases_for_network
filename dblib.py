@@ -36,11 +36,12 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
-import tarfile, logging, re, time, sys, tqdm
+import logging
+import re
 import os
 import configparser
 import collections

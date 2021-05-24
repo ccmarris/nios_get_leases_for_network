@@ -1,4 +1,5 @@
 Changelog:
+    20210524 v0.6.0 Updated db_object for ntp and lbdn
     20210519 v0.6.0 Adding output path option
     20210513 v0.5.8 Minor bug fix
     20210513 v0.5.7 Minor updates to dhcpoption logic
