@@ -197,7 +197,7 @@ objects:
     feature: NTP Server
     keypair:
         - ntp_service_enabled
-        - true
+        - 'true'
     properties:
         - enable_authentication
         - external_ntp_servers_enabled
