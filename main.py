@@ -95,9 +95,15 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
     with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
         count = 0
         #xmlfile.seek(0)
+<<<<<<< HEAD
         context = etree.iterparse(xmlfile, events=('end',), tag='OBJECT')
         for event, elem in context:
             if event == 'end':
+=======
+        context = etree.iterparse(xmlfile, events=('start','end'))
+        for event, elem in context:
+            if event == 'start' and elem.tag == 'OBJECT':
+>>>>>>> 80fe9ba58f55f010c705b173dcb0d4265151f498
                 count += 1
                 try:
                     obj_value = dblib.get_object_value(elem)
