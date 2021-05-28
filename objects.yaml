@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.2
+version: 0.3.3
 # Last updated: 20210513
 # Author: Chris Marrison
 
@@ -13,6 +13,7 @@ incompatible_options:
   - 58
   - 59
   - 124
+  - 125
   - 146
   - 156
   - 159
@@ -31,7 +32,6 @@ validate_options:
 
 # Previously Checked DHCP Options
 legacy_option_checks:
-  - 125
 
 # List of objects and parameters
 objects:

@@ -93,8 +93,6 @@ Basic examples::
 
 
     
-ew
-
 
 
 License
@@ -106,10 +104,10 @@ file for details.
 Aknowledgements
 ---------------
 
-A huge thanks to John Neardel for coming up with the idea and building the original
-prototype, and his contributions. Without this initial idea and work this project
-wouldn't have happened.
+A huge thanks to John Neerdael for coming up with the idea and building the
+original prototype, and his contributions. Without this initial idea and work
+this project wouldn't have happened.
 
-Thanks to John Steele and Don Smith for their input, and to Krishna for building a
-web front end and making this available to the field.
+Thanks to John Steele and Don Smith for their input, and especially to Krishna
+for building the web front end and making this available to the field.
 
