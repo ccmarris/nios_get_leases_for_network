@@ -53,6 +53,7 @@ import pprint
 from lxml import etree
 from itertools import (takewhile,repeat)
 
+rehex = re.compile('^[0-9a-fA-F:\s]*$')
 
 class DBCONFIG():
     '''
@@ -456,9 +457,23 @@ def processdhcpoption(xmlobject, count):
             value = property.attrib['VALUE']
     type, parentobj = checkparentobject(parent)
     optionspace, optioncode = checkdhcpoption(optiondef)
-    hexvalue, optionvalue = validatehex(value)
+    hexvalue = False
+    if rehex.match(value):
+        hexvalue = True
 
-    report = validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count)
+    values = [ 'parent', 'option_definition', 'value' ]
+    option_values = process_object(xmlobject, values)
+    if option_values:
+        parent = option_values['parent']
+        optiondef = option_values['option_definition']
+        value = option_values['value']
+        type, parentobj = checkparentobject(parent)
+        optionspace, optioncode = checkdhcpoption(optiondef)
+        hexvalue = False
+        if rehex.match(value):
+            hexvalue = True
+
+    report = validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, value, count)
     if len(report) == 1 and report[0] == '':
         report = None
 
@@ -469,13 +484,19 @@ def process_network(xmlobject, count):
     '''
     Look for /32 networks
     '''
-    cidr = address = ''
+    dict = {}
     for property in xmlobject:
-        if property.attrib['NAME'] == 'cidr':
-            cidr = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'address':
-            address = property.attrib['VALUE']
-    report = validatenetwork(address, cidr, count)
+        dict[property.attrib['NAME']] = property.attrib['VALUE']
+
+    cidr = dict.get('cidr')
+    address = dict.get('address')
+
+    if cidr == '32':
+        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address, '/' + cidr , str(count) ]
+        logging.debug(f'{report}')
+    else:
+        report = []
+
     if len(report) == 1 and report[0] == '':
         report = []
     return report
@@ -538,46 +559,42 @@ def get_object_value(xmlobject):
     for property in xmlobject:
         if property.attrib['NAME'] == '__type':
             obj = property.attrib['VALUE']
-        break
-    
+            break
+
     return str(obj)
 
 
 def checkparentobject(parent):
-    objects = re.search(r"(.*)\$(.*)", parent)
+    objects = parent.split('$')
     type = parentobj = ''
     if objects:
-        if objects.group(1) == '.com.infoblox.dns.network':
+        if objects[0] == '.com.infoblox.dns.network':
             type = 'NETWORK'
-            parentobj = re.sub(r'\/0$', '', objects.group(2))
-        elif objects.group(1) == '.com.infoblox.dns.fixed_address':
+            parentobj = objects[1][:-2]
+        elif objects[0] == '.com.infoblox.dns.fixed_address':
             type = 'FIXEDADDRESS'
-            parentobj = re.sub(r'\.0\.\.$', '', objects.group(2))
-        elif objects.group(1) == '.com.infoblox.dns.dhcp_range':
+            parentobj = objects[1][:-4]
+        elif objects[0] == '.com.infoblox.dns.dhcp_range':
             type = 'DHCPRANGE'
-            parentobj = re.sub(r'\/\/\/0\/$', '', objects.group(2))
-        elif objects.group(1) == '.com.infoblox.dns.network_container':
+            parentobj = objects[1][:-5]
+        elif objects[0] == '.com.infoblox.dns.network_container':
             type = 'NETWORKCONTAINER'
-            parentobj = re.sub(r'\/0$', '', objects.group(2))
-    else:
-        type = ''
-        parentobj = ''
-
+            parentobj = objects[1][:-2]
     return type, parentobj
 
 
 def checkdhcpoption(dhcpoption):
-    optioncodes = re.search(r"^(.*)\.\.(true|false)\.(\d+)$", dhcpoption)
-    if optioncodes:
-        optionspace = optioncodes.group(1)
-        optioncode = int(optioncodes.group(3))
+    optioncodes = dhcpoption.split('.')
+    optionspace = optioncode = ''
+    if dhcpoption == '':
+        optionspace = optioncode = ''
+        return optionspace, optioncode
     else:
-        optionspace = None
-        optioncode = None
+        optionspace = optioncodes[0]
+        optioncode = int(optioncodes[3])
+        return optionspace, optioncode
 
-    return optionspace, optioncode
-
-
+'''
 def validatehex(values):
     if re.search(r"^[0-9a-fA-F:\s]*$", values):
         # Normalize the HEX
@@ -591,7 +608,7 @@ def validatehex(values):
     else:
         hexvalue = False
         return hexvalue, values
-
+'''
 
 def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optionvalue, count):
     '''
@@ -618,10 +635,10 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
             r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
         r = []
-    
+
     validation = r
     logging.debug(f'{validation}')
-    
+
     return validation
 
 
