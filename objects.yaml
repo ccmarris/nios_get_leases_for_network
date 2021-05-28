@@ -10,6 +10,7 @@ db_type: NIOS
 # Incompatible DHCP Options
 incompatible_options:
   - 12
+  - 44 
   - 58
   - 59
   - 124
@@ -207,11 +208,30 @@ objects:
 
   # DHCP Options
   .com.infoblox.dns.option:
-      type: DHCP_Options
+      type: DHCP Options
       header: HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE,OBJECTLINE
       actions:
         - process
+        - collect
+      properties:
+        - is_ipv4
+        - parent
+        - option_definition
+        - value
       func: processdhcpoption
+
+  # DHCP Options Definitions
+  .com.infoblox.dns.option_definition:
+      type: DHCP Option Definition
+      actions:
+        - collect
+      properties:
+        - space
+        - name
+        - code
+        - is_ipv4
+        - type
+        - option_space_type
 
   # IPv4 Networks 
   .com.infoblox.dns.network:
