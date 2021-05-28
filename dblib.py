@@ -40,6 +40,7 @@ __version__ = '0.6.1'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
+import datetime
 import logging
 import re
 import os
@@ -280,6 +281,9 @@ class REPORT_CONFIG():
 
 # *** Functions ***
 
+# Global Var 
+CONFIG = DBCONFIG()
+
 def read_ini(ini_filename):
     '''
     Open and parse ini file
@@ -346,14 +350,43 @@ def process_object(xmlobject, collect_properties):
     Returns:
         Dictionary of properties
     '''
+    '''
     collected_data = collections.defaultdict()
     for property in xmlobject:
-        if property.attrib['NAME'] == '__type':
             obj_value = property.attrib['VALUE']
         if property.attrib['NAME'] in collect_properties:
             collected_data[property.attrib['NAME']] = property.attrib['VALUE'] 
 
     return collected_data
+    '''
+    obj_dict = obj_to_dict(xmlobject, collect_only=collect_properties)
+    logging.debug(f'- process_object: {obj_dict}')
+
+    return obj_dict
+
+
+def obj_to_dict(xmlobject, collect_only=None):
+    '''
+    Collect property/value pairs in dict
+
+    Parameters:
+        xmlobject (obj): object to process
+        collect_only (list): list of properties to return
+    
+    Returns:
+        dict of properties
+    '''
+    dict_obj = collections.defaultdict()
+    for property in xmlobject:
+        dict_obj[property.attrib['NAME']] = property.attrib['VALUE']
+    
+    if collect_only:
+        temp_dict = collections.defaultdict()
+        for k in dict_obj.keys():
+            temp_dict[k] = dict_obj[k]
+        dict_obj = temp_dict
+    
+    return dict_obj
 
 
 def dump_object(db_obj, xmlfile, property='', value=''):
@@ -368,9 +401,9 @@ def dump_object(db_obj, xmlfile, property='', value=''):
     
     '''
     found = False
-    context = etree.iterparse(xmlfile, events=('start','end'))
+    context = etree.iterparse(xmlfile, events=('end',), tag='OBJECT')
     for event, elem in context:
-        if event == 'start' and elem.tag == 'OBJECT':
+        if event == 'end':
             obj_value = get_object_value(elem)
             if obj_value == db_obj:
                 if property:
@@ -403,10 +436,7 @@ def output_object(xmlobject):
     Returns:
         Dictionary of properties
     '''
-    collected_properties = collections.defaultdict()
-    for property in xmlobject:
-        obj_value = property.attrib['VALUE']
-        collected_properties[property.attrib['NAME']] = property.attrib['VALUE'] 
+    collected_properties = obj_to_dict(xmlobject)
     pprint.pprint(collected_properties)
 
     return collected_properties
@@ -508,7 +538,7 @@ def get_object_value(xmlobject):
     for property in xmlobject:
         if property.attrib['NAME'] == '__type':
             obj = property.attrib['VALUE']
-            break
+        break
     
     return str(obj)
 
@@ -567,7 +597,6 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     '''
     Validate DHCP Options
     '''
-    CONFIG = DBCONFIG()
     incompatible_options = CONFIG.incompatible_options()
     validate_options = CONFIG.validate_options()
 
