@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.3
+version: 0.3.4
 # Last updated: 20210513
 # Author: Chris Marrison
 
@@ -54,9 +54,9 @@ objects:
       keypair:
         - property_name
         - expected_value
-      report:
-        - se
-        - pm
+#      report:
+#        - se
+#        - pm
 
   # Grid
   .com.infoblox.one.cluster:
@@ -70,8 +70,7 @@ objects:
       - heka_opt_in
       - enable_wins_forwarding
       - enable_extended_discovery
-    reports:
-      - pm
+      - enable_rir_swip
 
   # Nodes
   .com.infoblox.one.physical_node:
@@ -93,6 +92,10 @@ objects:
       - member_type
       - virtual_oid
       - host_name
+      - ha_enabled
+      - ipv6_enabled
+      - is_master
+      - is_potential_master
 
   # Licenses
   .com.infoblox.one.product_license:

@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210519
+ Date Last Updated: 20210528
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.6.1'
+__version__ = '0.7.0'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -282,7 +282,7 @@ class REPORT_CONFIG():
 
 # *** Functions ***
 
-# Global Var 
+# Read config as global var 
 CONFIG = DBCONFIG()
 
 def read_ini(ini_filename):
@@ -351,15 +351,6 @@ def process_object(xmlobject, collect_properties):
     Returns:
         Dictionary of properties
     '''
-    '''
-    collected_data = collections.defaultdict()
-    for property in xmlobject:
-            obj_value = property.attrib['VALUE']
-        if property.attrib['NAME'] in collect_properties:
-            collected_data[property.attrib['NAME']] = property.attrib['VALUE'] 
-
-    return collected_data
-    '''
     obj_dict = obj_to_dict(xmlobject, collect_only=collect_properties)
     logging.debug(f'- process_object: {obj_dict}')
 
@@ -384,7 +375,8 @@ def obj_to_dict(xmlobject, collect_only=None):
     if collect_only:
         temp_dict = collections.defaultdict()
         for k in dict_obj.keys():
-            temp_dict[k] = dict_obj[k]
+            if k in collect_only:
+                temp_dict[k] = dict_obj[k]
         dict_obj = temp_dict
     
     return dict_obj
@@ -448,18 +440,6 @@ def processdhcpoption(xmlobject, count):
     Look for DHCP options that need further verification
     '''
     parent = optiondef = value = ''
-    for property in xmlobject:
-        if property.attrib['NAME'] == 'parent':
-            parent = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'option_definition':
-            optiondef = property.attrib['VALUE']
-        elif property.attrib['NAME'] == 'value':
-            value = property.attrib['VALUE']
-    type, parentobj = checkparentobject(parent)
-    optionspace, optioncode = checkdhcpoption(optiondef)
-    hexvalue = False
-    if rehex.match(value):
-        hexvalue = True
 
     values = [ 'parent', 'option_definition', 'value' ]
     option_values = process_object(xmlobject, values)
@@ -484,10 +464,8 @@ def process_network(xmlobject, count):
     '''
     Look for /32 networks
     '''
-    dict = {}
-    for property in xmlobject:
-        dict[property.attrib['NAME']] = property.attrib['VALUE']
 
+    dict = obj_to_dict(xmlobject)
     cidr = dict.get('cidr')
     address = dict.get('address')
 
@@ -502,13 +480,13 @@ def process_network(xmlobject, count):
     return report
 
 
+"""
 def process_leases(xmlobject, count):
     '''
     Place holder
     '''
     return
 
-"""
 def process_zone(xmlobject, count):
     '''
     Process zone info
@@ -588,11 +566,10 @@ def checkdhcpoption(dhcpoption):
     optionspace = optioncode = ''
     if dhcpoption == '':
         optionspace = optioncode = ''
-        return optionspace, optioncode
     else:
         optionspace = optioncodes[0]
         optioncode = int(optioncodes[3])
-        return optionspace, optioncode
+    return optionspace, optioncode
 
 '''
 def validatehex(values):
@@ -620,18 +597,14 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     r = []
 
     if optioncode in incompatible_options:
-        # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
         r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     elif optioncode in validate_options:
         if optioncode == 43:
             if hexvalue == True:
-                # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
             elif hexvalue == False:
-                # logging.info('DHCPOPTION,INCOMPATIBLE,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
                 r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
         else:
-            # logging.info('DHCPOPTION,VALIDATION_NEEDED,' + type + ',' + parentobj + ',' + optionspace + ',' + str(optioncode) + ',' + optionvalue + ',' + str(count))
             r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
         r = []
