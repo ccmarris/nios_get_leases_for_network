@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -110,7 +110,7 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
                                 # Use friendly object name
                                 object_counts[obj_type] += 1
 
-                            # Action Enabled
+                            # Action Feature Enabled
                             elif action == 'feature':
                                 feature = OBJECTS.feature(obj_value)
                                 keypair = OBJECTS.keypair(obj_value)

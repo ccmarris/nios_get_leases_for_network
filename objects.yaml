@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.4
+version: 0.3.5
 # Last updated: 20210513
 # Author: Chris Marrison
 
@@ -169,6 +169,10 @@ objects:
       type: Grid DNS Settings
       actions:
         - collect
+      feature: DNS64
+      keypair:
+        - enable_dns64
+        - 'true'
       properties:
         - dns_health_check_enabled
         - allow_gss_tsig_zone_updates
@@ -182,6 +186,11 @@ objects:
       type: Member DNS Properties
       actions:
         - collect
+        - feature
+      feature: DNS64
+      keypair:
+        - enable_dns64
+        - 'true'
       properties:
         - dns_health_check_enabled
         - allow_gss_tsig_zone_updates
@@ -243,7 +252,7 @@ objects:
       actions:
         - count
         - feature
-      feature: IPv6 Networks
+      feature: IPv6_Networks
 
   # DHCP leases
   .com.infoblox.dns.lease:

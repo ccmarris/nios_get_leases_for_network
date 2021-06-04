@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -470,7 +470,7 @@ def process_network(xmlobject, count):
     address = dict.get('address')
 
     if cidr == '32':
-        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address, '/' + cidr , str(count) ]
+        report = [ 'DHCPNETWORK', 'CHECK_STATUS', address, '/' + cidr , str(count) ]
         logging.debug(f'{report}')
     else:
         report = []
@@ -597,13 +597,13 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
     r = []
 
     if optioncode in incompatible_options:
-        r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
+        r = [ 'DHCPOPTION', 'CHECK_GUARDRAILS', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     elif optioncode in validate_options:
         if optioncode == 43:
             if hexvalue == True:
                 r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
             elif hexvalue == False:
-                r = [ 'DHCPOPTION', 'INCOMPATIBLE', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
+                r = [ 'DHCPOPTION', 'CHECK_GUARDRAILS', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
         else:
             r = [ 'DHCPOPTION', 'VALIDATION_NEEDED', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
     else:
@@ -620,7 +620,7 @@ def validatenetwork(address, cidr, count):
     Look for /32 networks
     '''
     if cidr == '32':
-        report = [ 'DHCPNETWORK', 'INCOMPATIBLE', address, '/' + cidr , str(count) ]
+        report = [ 'DHCPNETWORK', 'CHECK_GUARDRAILS', address, '/' + cidr , str(count) ]
         logging.debug(f'{report}')
     else:
         report = []
