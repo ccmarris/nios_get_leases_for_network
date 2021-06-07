@@ -470,7 +470,7 @@ def process_network(xmlobject, count):
     address = dict.get('address')
 
     if cidr == '32':
-        report = [ 'DHCPNETWORK', 'CHECK_STATUS', address, '/' + cidr , str(count) ]
+        report = [ 'DHCPNETWORK', 'CHECK_GUARDRAILS', address, '/' + cidr , str(count) ]
         logging.debug(f'{report}')
     else:
         report = []
