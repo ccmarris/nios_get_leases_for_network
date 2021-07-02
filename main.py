@@ -8,7 +8,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210528
+ Date Last Updated: 20210702
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.1'
+__version__ = '0.7.2'
 __author__ = 'John Neerdael, Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 
@@ -56,15 +56,16 @@ def parseargs():
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
+    parser.add_argument('-y', '--yaml', action="store", help="Alternate yaml config file for objects", default='objects.yaml')
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
     return parser.parse_args()
 
-def report_versions():
+def report_versions(objyaml):
     '''
     Rerport code and config versions
     '''
-    DBCONFIG = dblib.DBCONFIG()
+    DBCONFIG = dblib.DBCONFIG(objyaml)
     RCONFIG = dblib.REPORT_CONFIG()
     version_report = { 'main': __version__, 
                        'dblib': dblib.__version__, 
@@ -74,7 +75,7 @@ def report_versions():
     return version_report
 
 
-def process_onedb(xmlfile, iterations, silent_mode=False):
+def process_onedb(xmlfile, iterations, silent_mode=False, objyaml=''):
     '''
     Process onedb.xml
     '''
@@ -91,7 +92,7 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
     report['member_counts'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
 
-    OBJECTS = dblib.DBCONFIG()
+    OBJECTS = dblib.DBCONFIG(objyaml)
     with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
         count = 0
         #xmlfile.seek(0)
@@ -173,11 +174,11 @@ def process_onedb(xmlfile, iterations, silent_mode=False):
     return report
 
 
-def output_reports(report, outfile, output_path=None):
+def output_reports(report, outfile, output_path=None, objyaml=''):
     '''
     Generate and output reports
     '''
-    OBJECTS = dblib.DBCONFIG()
+    OBJECTS = dblib.DBCONFIG(objyaml)
     REPORT_CONFIG = dblib.REPORT_CONFIG()
     report_dataframes = {}
     summary_report = {}
@@ -246,7 +247,8 @@ def process_backup(database,
                    silent_mode=False, 
                    dump_obj=None,
                    key_value=None,
-                   logfile=''):
+                   logfile='',
+                   objyaml=''):
     '''
     Determine whether backup File or XML
 
@@ -257,6 +259,7 @@ def process_backup(database,
         silent_mode (bool): Do not log to console
         dump_obj(bool): Dump object from database
         key_value(list): Key Value Pair to match using dump 
+        objyaml (str): Object config yaml file
     '''
     status = False
     t = time.perf_counter()
@@ -272,7 +275,8 @@ def process_backup(database,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
                                   key_value=key_value,
-                                  t=t)
+                                  t=t,
+                                  objyaml=objyaml)
 
         t2 = time.perf_counter() - t
         logging.info(f'EXTRACTED DATABASE FROM BACKUP IN {t2:0.2f}S')
@@ -286,7 +290,8 @@ def process_backup(database,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
                                   key_value=key_value,
-                                  logfile=logfile)
+                                  logfile=logfile,
+                                  objyaml=objyaml)
 
     return status
 
@@ -297,7 +302,8 @@ def process_file(xmlfile, outfile,
                  dump_obj=False, 
                  key_value=None,
                  logfile='',
-                 t=time.perf_counter()):
+                 t=time.perf_counter(),
+                 objyaml=''):
     '''
     Process file
 
@@ -309,6 +315,7 @@ def process_file(xmlfile, outfile,
         dump_obj(bool): Dump object from database
         logfile (str): Logging filename
         t (obj): time.perfcounter object
+        objyaml (str): Object config yaml file
     
     Returns:
         True or False 
@@ -324,7 +331,7 @@ def process_file(xmlfile, outfile,
         logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
 
         # searchrootobjects(xmlfile, iterations)
-        db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
+        db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode, objyaml=objyaml)
         output_reports(db_report, outfile, output_path=output_path)
 
         t4 = time.perf_counter() - t
@@ -350,6 +357,7 @@ def main():
     logfile = ''
     options = parseargs()
     database = options.database
+    objyaml = options.yaml
 
     # Set up logging & reporting
     # log events to the log file and to stdout
@@ -397,7 +405,7 @@ def main():
 
     # Check run mode
     if options.version:
-       v = report_versions()
+       v = report_versions(objyaml)
        pprint.pprint(v)
     else:
        process_backup(database, outfile, 
@@ -405,7 +413,8 @@ def main():
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
                       key_value=options.key_value,
-                      logfile=logfile)
+                      logfile=logfile,
+                      objyaml=objyaml)
 
     return exitcode
 
