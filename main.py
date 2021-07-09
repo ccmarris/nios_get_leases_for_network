@@ -324,8 +324,8 @@ def process_file(xmlfile, outfile,
         logging.info(f'COUNTED {iterations} OBJECTS IN {t3:0.2f}S')
 
         # searchrootobjects(xmlfile, iterations)
-        db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode)
-        output_reports(db_report, outfile, output_path=output_path)
+        db_report = process_onedb(xmlfile, iterations, silent_mode=silent_mode, objyaml=objyaml)
+        output_reports(db_report, outfile, output_path=output_path, objyaml=objyaml)
 
         t4 = time.perf_counter() - t
         logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
