@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.5
-# Last updated: 20210513
+version: 0.3.6
+# Last updated: 20210614
 # Author: Chris Marrison
 
 # Potential future use
@@ -29,6 +29,8 @@ validate_options:
   - 155
   - 157
   - 160
+  - 224
+  - 242
 
 # Previously Checked DHCP Options
 legacy_option_checks:
@@ -36,7 +38,7 @@ legacy_option_checks:
 # List of objects and parameters
 objects:
   #Template object
-  object:
+  object: 
       type: obj_type
       header: header
       actions:
@@ -271,6 +273,16 @@ objects:
       type: Fixed_Address
       actions:
         - count
+  
+  .com.infoblox.dns.dhcp_failover_association:
+      type: DHCP_FO
+      actions:
+        - collect
+      properties:
+        - name
+        - primary_server_vnode
+        - secondary_server_vnode
+        - split
 
   # Zones
   .com.infoblox.dns.zone:

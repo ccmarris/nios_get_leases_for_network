@@ -64,7 +64,7 @@ Complete list of modules::
 Configuration
 --------------
 
-There are two configuration files included 
+There are two configuration files included that
 
 Usage
 -----

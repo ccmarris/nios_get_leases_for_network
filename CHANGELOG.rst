@@ -1,4 +1,6 @@
 Changelog:
+    20210604 v0.7.1 Language change in reports
+    20210524 v0.7.0 Code clean-up after merge 
     20210524 v0.6.0 Updated db_object for ntp and lbdn
     20210519 v0.6.0 Adding output path option
     20210513 v0.5.8 Minor bug fix
