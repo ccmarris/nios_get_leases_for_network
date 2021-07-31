@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.6
-# Last updated: 20210614
+version: 0.3.7
+# Last updated: 20210731
 # Author: Chris Marrison
 
 # Potential future use
@@ -121,6 +121,8 @@ objects:
         - enable_cisco_ise_dhcpd_lease_publishing
         - enable_gss_tsig
         - v6_enable_gss_tsig
+        - v6_leases_scavenging_enabled
+        - v6_leases_scavenging_grace_period
         - enable_expert_mode
         - enable_ifmap
         - enable_roaming_hosts
@@ -131,6 +133,7 @@ objects:
         - pxe_lease_time_enabled
         - overload_bootp
         - deny_bootp
+        - recycle_leases
 
   # Member DHCP Config
   .com.infoblox.dns.member_dhcp_properties:
@@ -144,6 +147,10 @@ objects:
         - 'true'
       properties:
         - dns_update_style
+        - dhcp_utilization
+        - static_hosts
+        - dynamic_hosts
+        - total_hosts
         - enable_cisco_ise_dhcpd_lease_publishing
         - enable_gss_tsig
         - use_gss_tsig_keys
@@ -161,9 +168,12 @@ objects:
         - deny_bootp
         - pxe_lease_time_enabled
         - overload_bootp
+        - ignore_id
+        - use_ignore_id
         - recycle_leases
         - service_enabled
         - v6_service_enable
+        - use_v6_leases_scavenging
         - virtual_node
 
   # Cluster DNS Config

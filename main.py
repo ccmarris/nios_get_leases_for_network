@@ -8,7 +8,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210702
+ Date Last Updated: 20210731
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,8 +33,8 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.2'
-__author__ = 'John Neerdael, Chris Marrison'
+__version__ = '0.7.3'
+__author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
 import dblib
