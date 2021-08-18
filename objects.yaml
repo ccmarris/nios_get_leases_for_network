@@ -214,11 +214,11 @@ objects:
 
   # NTP Service
   .com.infoblox.one.vnode_time:
-    type: NTP Service
+    type: NTP_Server
     actions:
         - collect
         - feature
-    feature: NTP Server
+    feature: NTP_Server
     keypair:
         - ntp_service_enabled
         - 'true'

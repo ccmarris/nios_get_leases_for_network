@@ -1,4 +1,8 @@
 Changelog:
+    20210818 v0.7.5 Added list_object_types
+    20210818 v0.7.4 Added dump_all option
+    20210731 v0.7.3 Updated config
+    20210702 v0.7.2 Added option to specify alternate yaml file for objects
     20210604 v0.7.1 Language change in reports
     20210524 v0.7.0 Code clean-up after merge 
     20210524 v0.6.0 Updated db_object for ntp and lbdn

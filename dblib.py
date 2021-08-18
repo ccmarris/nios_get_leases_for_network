@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210528
+ Date Last Updated: 20210818
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.1'
+__version__ = '0.7.5'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -382,9 +382,9 @@ def obj_to_dict(xmlobject, collect_only=None):
     return dict_obj
 
 
-def dump_object(db_obj, xmlfile, property='', value=''):
+def dump_object(db_obj, xmlfile, all=False, property='', value=''):
     '''
-    Dump first instance of specified object
+    Dump first instance of specified object or all matching objects
 
     Parameters:
         one_db_obj (str): OneDB Object Type
@@ -403,12 +403,14 @@ def dump_object(db_obj, xmlfile, property='', value=''):
                     if check_feature(elem, key_name=property, expected_value=value):
                         output_object(elem)
                         found = True
-                        break
+                        if not all:
+                            break
                 else:
                     # Just match first object
                     output_object(elem)
                     found = True
-                    break
+                    if not all:
+                        break
                     
     if not found:
         if property:
@@ -433,6 +435,33 @@ def output_object(xmlobject):
     pprint.pprint(collected_properties)
 
     return collected_properties
+
+
+def list_object_types(xmlfile):
+    '''
+    List unique object types in NIOS db
+    
+    Parameters:
+        xmlfile (obj): File handler for XML file
+    
+    '''
+    obj_types = set()
+    status = False
+
+    context = etree.iterparse(xmlfile, events=('end',), tag='OBJECT')
+    for event, elem in context:
+        if event == 'end':
+            obj_types.add(get_object_value(elem))
+            
+    
+    if len(obj_types):
+        for obj in sorted(obj_types):
+            print(obj)
+        status = True
+    else:
+        print('No objects found')
+    
+    return status
 
 
 def processdhcpoption(xmlobject, count):

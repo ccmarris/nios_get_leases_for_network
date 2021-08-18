@@ -8,7 +8,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210731
+ Date Last Updated: 20210818
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -33,7 +33,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.3'
+__version__ = '0.7.5'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
@@ -51,8 +51,10 @@ def parseargs():
     parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility')
     parser.add_argument('-d', '--database', action="store", help="Path to database file", default='database.bak')
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
-    parser.add_argument('-p', '--output_path', action="store", default='', help="Output file path (optional)")
+    parser.add_argument('-p', '--output_path', type=str, default='', help="Output file path (optional)")
     parser.add_argument('--dump', type=str, default='', help="Dump Object")
+    parser.add_argument('--dump_all', action='store_true', help="Dump All Objects")
+    parser.add_argument('--list_objects', action='store_true', help="Dump All Objects")
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
@@ -246,6 +248,8 @@ def process_backup(database,
                    output_path=None,
                    silent_mode=False, 
                    dump_obj=None,
+                   dump_all=False,
+                   list_objs=False,
                    key_value=None,
                    logfile='',
                    objyaml=''):
@@ -257,7 +261,9 @@ def process_backup(database,
         outfile (str): postfix for output files
         output_path (str): Path for file output
         silent_mode (bool): Do not log to console
-        dump_obj(bool): Dump object from database
+        dump_obj(str): Dump object from database
+        dump_all(bool): Dump all specified objects
+        list_objs(bool): List all object types
         key_value(list): Key Value Pair to match using dump 
         objyaml (str): Object config yaml file
     '''
@@ -274,6 +280,8 @@ def process_backup(database,
                                   output_path=output_path,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
+                                  dump_all=dump_all,
+                                  list_objs=list_objs,
                                   key_value=key_value,
                                   t=t,
                                   objyaml=objyaml)
@@ -289,6 +297,7 @@ def process_backup(database,
                                   output_path=output_path,
                                   silent_mode=silent_mode, 
                                   dump_obj=dump_obj,
+                                  dump_all=dump_all,
                                   key_value=key_value,
                                   logfile=logfile,
                                   objyaml=objyaml)
@@ -299,7 +308,9 @@ def process_backup(database,
 def process_file(xmlfile, outfile, 
                  output_path=None,
                  silent_mode=False, 
-                 dump_obj=False, 
+                 dump_obj=None,
+                 dump_all=False,
+                 list_objs=False,
                  key_value=None,
                  logfile='',
                  t=time.perf_counter(),
@@ -312,7 +323,9 @@ def process_file(xmlfile, outfile,
         outfile (str): postfix for output files
         output_path (str): Path for file output
         silent_mode (bool): Do not log to console
-        dump_obj(bool): Dump object from database
+        dump_obj(str): Dump object from database
+        dump_all(bool): Dump all specified objects
+        list_objs(bool): List all object types
         logfile (str): Logging filename
         t (obj): time.perfcounter object
         objyaml (str): Object config yaml file
@@ -322,7 +335,7 @@ def process_file(xmlfile, outfile,
     '''
     status = False
 
-    if not dump_obj:
+    if not dump_obj and not list_objs:
         t2 = time.perf_counter() - t
         iterations = dblib.rawincount(xmlfile)
         xmlfile.seek(0)
@@ -338,13 +351,21 @@ def process_file(xmlfile, outfile,
         logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
         status = True
 
-    else:
+    if dump_obj:
         if key_value:
-            if dblib.dump_object(dump_obj, xmlfile, property=key_value[0], value=key_value[1]):
+            if dblib.dump_object(dump_obj, 
+                                 xmlfile, 
+                                 all=dump_all,
+                                 property=key_value[0], 
+                                 value=key_value[1]):
                 status = True
         else:
-            if dblib.dump_object(dump_obj, xmlfile):
+            if dblib.dump_object(dump_obj, xmlfile, all=dump_all):
                 status = True
+    
+    if list_objs:
+        if dblib.list_object_types(xmlfile):
+            status = True
 
     return status
 
@@ -412,6 +433,8 @@ def main():
                       output_path = output_path,
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
+                      dump_all=options.dump_all,
+                      list_objs=options.list_objects,
                       key_value=options.key_value,
                       logfile=logfile,
                       objyaml=objyaml)
