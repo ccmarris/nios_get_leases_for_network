@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.7
-# Last updated: 20210731
+version: 0.3.9
+# Last updated: 20210818
 # Author: Chris Marrison
 
 # Potential future use
@@ -293,6 +293,13 @@ objects:
         - primary_server_vnode
         - secondary_server_vnode
         - split
+  
+  .com.infoblox.dns.cluster_mac_filterset_item:
+      type: MAC_Filter_Items
+      header: HEADER-MACPREFIX,STATUS,MAC_PREFIX,MAC_FILTER,OBJECTLINE
+      actions:
+          - process
+      func: process_mac_filter_item
 
   # Zones
   .com.infoblox.dns.zone:

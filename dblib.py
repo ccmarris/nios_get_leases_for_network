@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.5'
+__version__ = '0.7.6'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -506,6 +506,23 @@ def process_network(xmlobject, count):
 
     if len(report) == 1 and report[0] == '':
         report = []
+    return report
+
+
+def process_mac_filter_item(xmlobject, count):
+    '''
+    Look for Mac prefix filters
+    '''
+    report = []
+    dict = obj_to_dict(xmlobject)
+    mac_address = dict.get('mac_address')
+    mac_filter = dict.get('dhcp_mac_filter')
+
+    if len(mac_address.split(':')) < 6:
+        report = [ 'MAC_PREFIX_FILTER', 'CHECK_GUARDRAILS', mac_address, 
+                   mac_filter, str(count) ]
+        logging.debug(f'{report}')
+    
     return report
 
 

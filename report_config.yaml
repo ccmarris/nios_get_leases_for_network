@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis report configuration file
-version: 0.0.9
-# Last updated: 20210513
+version: 0.1.0
+# Last updated: 20210818
 # Author: Chris Marrison
 
 # Report Output (future use)
@@ -29,6 +29,11 @@ summary_items:
     keys:
       - STATUS
       - CIDR
+  MAC_Filter_Items:
+    name: MAC_Prefix_Filters
+    keys:
+      - STATUS
+      - MAC_FILTER
 
 # Currently Not used
 Incompatible Features:
