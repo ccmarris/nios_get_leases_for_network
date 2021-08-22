@@ -2,11 +2,13 @@
 '''
 ------------------------------------------------------------------------
  Description:
-   Python script to search for feature gaps between NIOS and BloxOne DDI
+   Python script to generate and NIOS Shared Record Group Report
+ Note:
+   This is a fork of database_analysis v0.7.5
  Requirements:
    Python3 with lxml, argparse, tarfile, logging, re, time, sys, tqdm
 
- Author: Chris Marrison & John Neerdael
+ Author: Chris Marrison
 
  Date Last Updated: 20210818
 
@@ -33,7 +35,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.6'
+__version__ = '0.7.7'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
@@ -58,7 +60,8 @@ def parseargs():
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
-    parser.add_argument('-y', '--yaml', action="store", help="Alternate yaml config file for objects", default='objects.yaml')
+    parser.add_argument('-y', '--yaml', type=str, help="Alternate yaml config file for objects", default='srgobjects.yaml')
+    parser.add_argument('-r', '--ryaml', type=str, help="Alternate report yaml config file for objects", default='report_config.yaml')
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
     return parser.parse_args()
@@ -225,9 +228,19 @@ def output_reports(report, outfile, output_path=None, objyaml=''):
                 report_dataframes['features'] = dblib.report_features(report['features'],
                                                                       REPORT_CONFIG,
                                                                       OBJECTS)
+        # Additional reports
+        elif section == 'srg':
+            logging.info('Generating report for SRGs')
+            report_dataframes['srg'] = dblib.report_srg(report['collected'],
+                                                        REPORT_CONFIG,
+                                                        OBJECTS)
+            dblib.output_to_excel(report_dataframes['srg'],
+                                    title='SRG Report',
+                                    output_path=output_path,
+                                    filename=outfile)
 
         elif section == 'summary':
-            summary_report = dblib.generate_summary(report_dataframes,
+            summary_report = dblib.generate_summary(report['collected'],
                                                     REPORT_CONFIG,
                                                     OBJECTS)
             dblib.output_to_excel(summary_report,

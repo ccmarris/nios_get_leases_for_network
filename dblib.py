@@ -232,6 +232,10 @@ class DBCONFIG():
     def validate_options(self):
         return self.config['validate_options']
 
+    
+    def srg_records(self):
+        return self.config['srg_records']
+
 
 class REPORT_CONFIG():
     '''
@@ -526,28 +530,6 @@ def process_mac_filter_item(xmlobject, count):
     return report
 
 
-"""
-def process_leases(xmlobject, count):
-    '''
-    Place holder
-    '''
-    return
-
-def process_zone(xmlobject, count):
-    '''
-    Process zone info
-    '''
-    ztype = ''
-    zone = ''
-    for property in xmlobject:
-        if property.attrib['NAME'] == 'zone_type':
-            ztype = property.attrib['VALUE']
-        if property.attrib['NAME'] == 'display_name':
-            zone = property.attrib['VALUE']
-    return [ zone, ztype, count ]
-"""
-
-
 def rawincount(filename):
     bufgen = takewhile(lambda x: x, (filename.raw.read(1024*1024) for _ in repeat(None)))
     return sum( buf.count(b'\n') for buf in bufgen )
@@ -807,6 +789,44 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     logging.debug(report_df)
     
     return report_df
+
+
+def report_srg(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Generate SRG Report for data import
+    '''
+    # srgs = collections.defaultdict()
+    report_dfs = collections.defaultdict(pd.DataFrame)
+    srgs = []
+    zone_list = []
+    srg_obj = '.com.infoblox.dns.srg'
+
+    if srg_obj in report.keys():
+        for group in report[srg_obj]:
+            zone_list = srg_zone_list(report, group['zone'])
+            srgs.append({'srg': group['zone'],
+                         'name': group['name'],
+                         'linked_zones':  zone_list })
+
+        report_dfs['SRGs'] = pd.DataFrame.from_dict(srgs)
+        # report_df = pd.DataFrame(srgs)
+        logging.debug(report_dfs)
+    return report_dfs
+
+
+def srg_zone_list(report, srg):
+    '''
+    Take table of SRG/zone mappings and convert in to list
+    '''
+    srg_zones = []
+    srg_zone_links = '.com.infoblox.dns.srg_zone_linking'
+
+    if srg_zone_links in report.keys():
+        for group in report[srg_zone_links]:
+            if group.get('srg') == srg:
+                srg_zones.append(group.get('zone'))
+    
+    return srg_zones
 
 
 def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
