@@ -1,6 +1,6 @@
 ---
 # NIOS onedb analysis report configuration file
-version: 0.1.0
+version: 0.2.0
 # Last updated: 20210818
 # Author: Chris Marrison
 
@@ -14,7 +14,9 @@ report_sections:
   - counters
   - features
   - member_counts
+  - activeip
   - summary
+  # - srg
 
 # Define Keys for uniqueness matching in summary reports
 summary_items:
@@ -48,3 +50,7 @@ Incompatible Features:
       properties: 
       value: 
 
+# SRG Objects (srg reporting.
+srg_objects:
+  - .com.infoblox.dns.srg
+  - .com.infoblox.dns.srg_zone_linking

@@ -1,4 +1,5 @@
 Changelog:
+    20210824 v0.8.0 Added Active IP Estimates
     20210818 v0.7.5 Added list_object_types
     20210818 v0.7.4 Added dump_all option
     20210731 v0.7.3 Updated config

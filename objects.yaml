@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.3.9
-# Last updated: 20210818
+version: 0.4.0
+# Last updated: 20210824
 # Author: Chris Marrison
 
 # Potential future use
@@ -12,8 +12,21 @@ incompatible_options:
   - 12
   - 58
   - 59
+  - 90
+  - 91
+  - 92
+  - 94
+  - 95
+  - 96
+  - 115
+  - 120
+  - 121
+  - 122
+  - 123
   - 124
   - 125
+  - 126
+  - 127
   - 146
   - 156
   - 159
@@ -47,18 +60,18 @@ objects:
         - count
         - feature
         - member
+        - activeip
       func: proc_obj
       feature: feature_desc
       properties:
         - list
         - of
         - properties
+      ip_field:
+        - field_name
       keypair:
         - property_name
         - expected_value
-#      report:
-#        - se
-#        - pm
 
   # Grid
   .com.infoblox.one.cluster:
@@ -273,6 +286,7 @@ objects:
       actions:
         - count
         - member
+        - activeip
         # - collect
       func: member_leases
       properties:
@@ -283,6 +297,7 @@ objects:
       type: Fixed_Address
       actions:
         - count
+        - activeip
   
   .com.infoblox.dns.dhcp_failover_association:
       type: DHCP_FO
@@ -301,24 +316,43 @@ objects:
           - process
       func: process_mac_filter_item
 
-  # Zones
+  # Views & Zones
+  .com.infoblox.dns.view:
+      type: DNS View      
+      actions:
+        - collect
+      properties:
+        - displayname
+        - blacklist_enabled
+        - blacklist_action
+        - enable_dns64
+        - filter_aaa
+        - enable_mat_recursion_only
+        - enable_rpz_recursive_only
+        - forwarders_only
+        - is_ddns_view
+        - network_view
+        - recursion_enabled
+        - use_dns64
+        - zone
+
   .com.infoblox.dns.zone:
-        type: DNS_Zones
-        actions:
-            - count
-            - collect
-        func: process_zone
-        properties:
-            - name
-            - display_name
-            - fqdn
-            - view_key
-            - zone_type
-            - primary_type
-            - parent
-            - is_multimaster
-            - is_external_primary
-            - assigned_ns_group
+      type: DNS_Zones
+      actions:
+          - count
+          - collect
+      func: process_zone
+      properties:
+          - name
+          - display_name
+          - fqdn
+          - view_key
+          - zone_type
+          - primary_type
+          - parent
+          - is_multimaster
+          - is_external_primary
+          - assigned_ns_group
 
   # DTC
   .com.infoblox.dns.dtc:
@@ -414,6 +448,7 @@ objects:
     type: Host_Records
     actions:
       - count
+      - activeip
 
   .com.infobox.dns.host_alias:
     type: Host_Records
@@ -424,11 +459,13 @@ objects:
     type: A_Records
     actions:
       - count
+      - activeip
 
   .com.infoblox.dns.bind_aaaa:
     type: AAAA_Records
     actions:
       - count
+      - activeip
 
   .com.infoblox.dns.bind_cname:
     type: CNAME_Records
@@ -474,6 +511,7 @@ objects:
     type: PTR_Records
     actions:
       - count
+      - activeip
 
   .com.infoblox.dns.bind_rrsig:
     type: RRSIG_Records

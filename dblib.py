@@ -671,6 +671,87 @@ def member_leases(xmlobject):
     return member
 
 
+def process_activeip(xmlobject):
+    '''
+    Collect IP if deemed active
+    '''
+    ip_identifier = ''
+    obj_value = get_object_value(xmlobject)
+    properties = obj_to_dict(xmlobject)
+
+    # Active Leases
+    if obj_value == '.com.infoblox.dns.lease':
+       if properties['binding_state'] == 'active': 
+           network_view = properties.get('network_view', '0')
+           ip_identifier = f'{network_view}${properties["ip_address"]}'
+    # Fixed Addresses
+    elif obj_value == '.com.infoblox.dns.fixed_address':
+        network_view = properties.get('network_view', '0')
+        ip_identifier = f'{network_view}${properties["ip_address"]}'
+    # Host Addresses
+    elif obj_value == '.com.infoblox.dns.host_address':
+        network_view = properties.get('dhcp_delegation_root', '$0').split('$')[1]
+        ip_identifier = f'{network_view}${properties["address"]}'
+    # A Records
+    elif obj_value == '.com.infoblox.dns.bind_a':
+        dns_view = properties.get('zone', '._default').split('.')[1]
+        ip_identifier = f'{dns_view}${properties["address"]}'
+    # AAAA Records
+    elif obj_value == '.com.infoblox.dns.bind_aaaa':
+        dns_view = properties.get('zone', '._default').split('.')[1]
+        ip_identifier = f'{dns_view}${properties["address"]}'
+    # PTR Records
+    elif obj_value == '.com.infoblox.dns.bind_ptr':
+        ip_identifier = ip_from_ptr(properties)
+    # Not Applicable
+    else:
+        ip_identifier = ''
+
+    return ip_identifier
+
+
+def ip_from_ptr(properties):
+    '''
+    Convert dict of .com.infoblox.dns.bind_ptr to IP address
+    '''
+    ip_id = ''
+    zone = properties.get('zone').split('.')
+    dns_view = zone[1]
+
+    # Check IP version
+    if zone[3] == 'in-addr':
+        delimiter = '.'
+    else:
+        delimiter = ':'
+    # Build IP identity
+    ip_id = f'{dns_view}$'
+    # Generate IP string
+    for i in range(4, len(zone)):
+        ip_id += f'{zone[i]}{delimiter}' 
+    ip_id += properties['name']
+
+    return ip_id
+
+
+def reverse_labels(domain):
+    '''
+    Reserve order of domain labels (or any dot separated data, e.g. IP)
+
+    Parameters:
+        domain (str): domain.labels
+    Returns:
+        rdomain (str): labels.domain
+    '''
+    rdomain = ""
+    labels = domain.split(".")
+    for l in reversed(labels):
+        if rdomain:
+            rdomain = rdomain+"."+l
+        else:
+            rdomain = l
+    return rdomain
+
+
 def writeheaders():
     logging.info('HEADER-DHCPOPTION,STATUS,OBJECTTYPE,OBJECT,OPTIONSPACE,OPTIONCODE,OPTIONVALUE')
     logging.info('HEADER-DHCPNETWORK,STATUS,OBJECT,OBJECTLINE')
@@ -791,6 +872,77 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     return report_df
 
 
+def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
+    '''
+    Report Active IP Estimate
+    '''
+    view = '0'
+    total = 0
+    dns_views = report['collected'].get('.com.infoblox.dns.view')
+    dataset = []
+    view_ip = collections.defaultdict()
+    per_view_report = []
+    report_dfs = collections.defaultdict(pd.DataFrame)
+    net_objs = [ '.com.infoblox.dns.lease', '.com.infoblox.dns.fixed_address']
+
+    logging.info(f'Generating dataframe for active IP estimate')
+    # Get Network Views for DNS objects
+    for obj in report['activeip'].keys():
+        type_report = collections.defaultdict()
+        obj_type = DBOBJECTS.obj_type(obj)
+
+        # Interate over IP identifiers for obj
+        for ip_id in report['activeip'][obj]:
+            ip_identifier = ip_id.split('$')
+            if len(ip_identifier) == 2:
+                view = ip_identifier[0]
+                ip = ip_identifier[1]
+            else:
+                logging.debug(f'{obj} {ip_identifier}')
+                view = '0'
+                ip = '0.0.0.0'
+            if obj not in net_objs:
+                # Get associated network view
+                for dview in dns_views:
+                    if dview.get('zone') == f'.{view}':
+                        view = dview.get('network_view')
+                        break
+            # Check for dictionary elements
+            if view not in type_report.keys():
+                type_report[view] = set()
+            if view not in view_ip.keys():
+                view_ip[view] = set()
+            # Assign to reports
+            type_report[view].add(ip)
+            view_ip[view].add(ip)
+    
+        # Build per object Reports
+        for v in type_report.keys():
+            # dataset[obj_type] += len(type_report[v])
+            dataset.append({ 'Object Type': obj_type,
+                             'Est_Active_IPs': len(type_report[v]) } )
+            
+    # Unique per Network View Report
+    for v in view_ip.keys():
+        unique_ip_count = len(view_ip[v])
+        per_view_report.append({ 'Network View': v,
+                                 'Est_Active_IPs': unique_ip_count } )
+        # per_view_report[v] = len(view_ip[v])
+        total += unique_ip_count
+    per_view_report.append({'Network View': 'Total Active IP Estimate:',
+                            'Est_Active_IPs': total })
+
+            
+    report_dfs['Active IP by Type'] = pd.DataFrame.from_records(dataset)
+    report_dfs['Active IP by View'] = pd.DataFrame.from_records(per_view_report)
+
+    print(report_dfs['Active IP by View'])
+    logging.debug(report_dfs) 
+
+    return report_dfs
+    
+
+
 def report_srg(report, REPORT_CONFIG, DBOBJECTS):
     '''
     Generate SRG Report for data import
@@ -859,5 +1011,9 @@ def generate_summary(report, REPORT_CONFIG, DBOBJECTS):
     
     if 'features' in report.keys():
         summary_report['Features'] = report['features']
+    
+    if 'activeip' in report.keys():
+        for item in report['activeip'].keys():
+            summary_report[item] = report['activeip'][item]
     
     return summary_report

@@ -10,7 +10,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20210818
+ Date Last Updated: 20210823
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -35,7 +35,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.7'
+__version__ = '0.8.0'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
@@ -60,7 +60,7 @@ def parseargs():
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
-    parser.add_argument('-y', '--yaml', type=str, help="Alternate yaml config file for objects", default='srgobjects.yaml')
+    parser.add_argument('-y', '--yaml', type=str, help="Alternate yaml config file for objects", default='objects.yaml')
     parser.add_argument('-r', '--ryaml', type=str, help="Alternate report yaml config file for objects", default='report_config.yaml')
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
@@ -95,6 +95,7 @@ def process_onedb(xmlfile, iterations, silent_mode=False, objyaml=''):
     report['counters'] = object_counts
     report['features'] = enabled_features
     report['member_counts'] = collections.defaultdict()
+    report['activeip'] = collections.defaultdict()
     # node_lease_count = collections.Counter()
 
     OBJECTS = dblib.DBCONFIG(objyaml)
@@ -156,6 +157,12 @@ def process_onedb(xmlfile, iterations, silent_mode=False, objyaml=''):
                                 member = process_object(elem)
                                 if member:
                                     report['member_counts'][obj_type][member] += 1
+                            
+                            # Action Active IP Estimate
+                            elif action == 'activeip':
+                                if obj_value not in report['activeip'].keys():
+                                    report['activeip'][obj_value] = set()
+                                report['activeip'][obj_value].add(dblib.process_activeip(elem))
                                     
                             # Action Not Implemented
                             else:
@@ -228,6 +235,12 @@ def output_reports(report, outfile, output_path=None, objyaml=''):
                 report_dataframes['features'] = dblib.report_features(report['features'],
                                                                       REPORT_CONFIG,
                                                                       OBJECTS)
+            elif section == 'activeip':
+                logging.info('Generating dataframes for Active IP Estimate')
+                report_dataframes['activeip'] = dblib.report_activeip(report,
+                                                                      REPORT_CONFIG,
+                                                                      OBJECTS)
+            
         # Additional reports
         elif section == 'srg':
             logging.info('Generating report for SRGs')
@@ -240,7 +253,7 @@ def output_reports(report, outfile, output_path=None, objyaml=''):
                                     filename=outfile)
 
         elif section == 'summary':
-            summary_report = dblib.generate_summary(report['collected'],
+            summary_report = dblib.generate_summary(report_dataframes,
                                                     REPORT_CONFIG,
                                                     OBJECTS)
             dblib.output_to_excel(summary_report,
