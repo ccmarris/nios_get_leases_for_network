@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210818
+ Date Last Updated: 20210824
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.7.6'
+__version__ = '0.8.1'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -681,7 +681,7 @@ def process_activeip(xmlobject):
 
     # Active Leases
     if obj_value == '.com.infoblox.dns.lease':
-       if properties['binding_state'] == 'active': 
+       if properties.get('binding_state') == 'active': 
            network_view = properties.get('network_view', '0')
            ip_identifier = f'{network_view}${properties["ip_address"]}'
     # Fixed Addresses
