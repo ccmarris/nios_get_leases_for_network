@@ -950,7 +950,6 @@ def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
     report_dfs['Active IP by View'] = pd.DataFrame.from_records(per_view_report)
     report_dfs['Estimated Active IPs'] = pd.DataFrame.from_records(total_est)
 
-    print(report_dfs['Active IP by View'])
     logging.debug(report_dfs) 
 
     return report_dfs
