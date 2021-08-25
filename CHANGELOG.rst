@@ -1,4 +1,5 @@
 Changelog:
+    20210825 v0.8.1 Enhancements to Active IP and check for DHCP Fingerprint filters
     20210824 v0.8.0 Added Active IP Estimates
     20210818 v0.7.5 Added list_object_types
     20210818 v0.7.4 Added dump_all option

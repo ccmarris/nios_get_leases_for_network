@@ -1,7 +1,7 @@
 ---
 # NIOS onedb analysis configuration file
-version: 0.4.0
-# Last updated: 20210824
+version: 0.4.2
+# Last updated: 20210825
 # Author: Chris Marrison
 
 # Potential future use
@@ -250,6 +250,18 @@ objects:
         - process
       func: processdhcpoption
 
+  # Network Views
+  .com.infoblox.dns.network_view:
+      type: Network_Views
+      actions:
+        - collect
+      properties:
+        - id
+        - name
+        - use_subscribe_settings
+        - enable_view_display
+        - netmri_id
+
   # IPv4 Networks 
   .com.infoblox.dns.network:
       type: Networks
@@ -260,6 +272,7 @@ objects:
         - collect
       properties:
         - address
+        - network_view
         - cidr
         - override_boot_server
         - override_boot_file
@@ -315,6 +328,16 @@ objects:
       actions:
           - process
       func: process_mac_filter_item
+
+  # Fingerprint Filters
+  .com.infoblox.dns.fingerprint_filter_rule:
+      type: DHCP_Fingerprint_Filter
+      actions:
+        - feature
+      feature: DHCP_Fingerprint_Filter
+      keypair:
+        - __type
+        - .com.infoblox.dns.fingerprint_filter_rule
 
   # Views & Zones
   .com.infoblox.dns.view:

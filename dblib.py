@@ -9,7 +9,7 @@
 
  Author: Chris Marrison & John Neerdael
 
- Date Last Updated: 20210824
+ Date Last Updated: 20210825
  
  Copyright (c) 2021 John Neerdael / Infoblox
 
@@ -706,6 +706,8 @@ def process_activeip(xmlobject):
     # Not Applicable
     else:
         ip_identifier = ''
+    
+    logging.debug(f'{obj_value} - {ip_identifier}')
 
     return ip_identifier
 
@@ -867,6 +869,7 @@ def report_features(report, REPORT_CONFIG, DBOBJECTS):
     '''
     logging.info(f'Generating dataframe for features')
     report_df = pd.DataFrame(report.items(), columns=['Feature', 'Enabled'])
+    report_df.fillna('Check Req')
     logging.debug(report_df)
     
     return report_df
@@ -879,6 +882,7 @@ def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
     view = '0'
     total = 0
     dns_views = report['collected'].get('.com.infoblox.dns.view')
+    network_views = report['collected'].get('.com.infoblox.dns.network_view')
     dataset = []
     view_ip = collections.defaultdict()
     per_view_report = []
@@ -888,6 +892,7 @@ def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
     logging.info(f'Generating dataframe for active IP estimate')
     # Get Network Views for DNS objects
     for obj in report['activeip'].keys():
+        type_counter = int()
         type_report = collections.defaultdict()
         obj_type = DBOBJECTS.obj_type(obj)
 
@@ -918,23 +923,32 @@ def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
     
         # Build per object Reports
         for v in type_report.keys():
-            # dataset[obj_type] += len(type_report[v])
-            dataset.append({ 'Object Type': obj_type,
-                             'Est_Active_IPs': len(type_report[v]) } )
+            type_counter += len(type_report[v])
+
+        dataset.append({ 'Object Type': obj_type,
+                         'Est_Active_IPs': type_counter } )
             
     # Unique per Network View Report
     for v in view_ip.keys():
+        vname = v
         unique_ip_count = len(view_ip[v])
-        per_view_report.append({ 'Network View': v,
+        # Get network view name
+        for nview in network_views:
+            if nview.get('id') == v:
+                vname = nview.get('name')
+                break
+        per_view_report.append({ 'Network View': vname,
                                  'Est_Active_IPs': unique_ip_count } )
-        # per_view_report[v] = len(view_ip[v])
         total += unique_ip_count
     per_view_report.append({'Network View': 'Total Active IP Estimate:',
                             'Est_Active_IPs': total })
+    
+    total_est = [ { 'Estimated Active IPs': total }]
 
             
     report_dfs['Active IP by Type'] = pd.DataFrame.from_records(dataset)
     report_dfs['Active IP by View'] = pd.DataFrame.from_records(per_view_report)
+    report_dfs['Estimated Active IPs'] = pd.DataFrame.from_records(total_est)
 
     print(report_dfs['Active IP by View'])
     logging.debug(report_dfs) 
