@@ -887,7 +887,9 @@ def report_activeip(report, REPORT_CONFIG, DBOBJECTS):
     view_ip = collections.defaultdict()
     per_view_report = []
     report_dfs = collections.defaultdict(pd.DataFrame)
-    net_objs = [ '.com.infoblox.dns.lease', '.com.infoblox.dns.fixed_address']
+    net_objs = [ '.com.infoblox.dns.lease', 
+                 '.com.infoblox.dns.fixed_address',
+                 '.com.infoblox.dns.host_address']
 
     logging.info(f'Generating dataframe for active IP estimate')
     # Get Network Views for DNS objects
