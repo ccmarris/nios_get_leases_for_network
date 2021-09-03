@@ -1,0 +1,186 @@
+---
+# NIOS onedb analysis configuration file
+version: 0.0.1
+# Last updated: 20210825
+# Author: Chris Marrison
+
+# Potential future use
+db_type: MS-DHCP
+
+# Incompatible DHCP Options
+incompatible_options:
+  - 12
+  - 58
+  - 59
+  - 90
+  - 91
+  - 92
+  - 94
+  - 95
+  - 96
+  - 115
+  - 120
+  - 121
+  - 122
+  - 123
+  - 124
+  - 125
+  - 126
+  - 127
+  - 146
+  - 156
+  - 159
+  - 212 
+
+# DHCP Options that need further validation
+validate_options:
+  - 43
+  - 151
+  - 152
+  - 153
+  - 154
+  - 155
+  - 157
+  - 160
+  - 224
+  - 242
+
+# Previously Checked DHCP Options
+legacy_option_checks:
+
+# List of objects and parameters
+objects:
+  #Template object
+  object: 
+      type: obj_type
+      header: header
+      actions:
+        - process
+        - collect
+        - count
+        - feature
+        - member
+        - activeip
+      func: proc_obj
+      feature: feature_desc
+      properties:
+        - list
+        - of
+        - properties
+      ip_field:
+        - field_name
+      keypair:
+        - property_name
+        - expected_value
+
+  # Classes
+  Class:
+    type: DHCP_Class
+    actions:
+      - collect
+    properties:
+      - Name
+      - Type
+      - Vendor
+      - Data
+      - Description
+  
+  # Options
+  OptionDefinition:
+    type: OptionDefinitions
+    actions:
+      - collect
+    properties:
+      - Name
+      - OptionId
+      - Type
+      - VendorClass
+      - MultiValued
+  
+  OptionValue:
+    type: OptionValues
+    actions:
+      - collect
+    properties:
+      - OptionId
+      - UserClass
+      - Value
+      - VendorClass
+
+  # Scopes
+  # Suporscope
+  Scope:
+    type: Scope
+    actions:
+      - collect
+    properties:
+      - ActivatePolicies
+      - Delay
+      - Description
+      - EndRange
+      - ExclusionRanges
+      - LeaseDuration
+      - Leases
+      - MaxBootpClients
+      - Name
+      - NapEnable
+      - NapProfile
+      - OptionValues
+      - ScopeId
+      - StartRange
+      - State
+      - SubnetMask
+      - SuperScopeName
+      - Type
+
+  IPv4:
+    type: IPv4
+    actions:
+      - collect
+    properties:
+      - ActivatePolicies
+      - Classes
+      - ConflictDetectionAttempts
+      - Filters
+      - NapEnabled
+      - NpsUnreachableAction
+      - OptionDefinitions
+      - OptionValues
+      - Scopes
+
+  IPv6:
+    type: IPv6
+    actions:
+      - collect
+    properties:
+      - Classes
+      - OptionDefinitions
+      - StatelessStore
+
+  Lease:
+    type: Lease
+    actions:
+      - collect
+    properties:
+      - AddressState
+      - ClientId
+      - ClientType
+      - DnsRR
+      - DnsRegistration
+      - HostName
+      - IPAddress
+      - LeaseExpiryTime
+      - NapCapable
+      - NapStatus
+      - ScopeId
+
+  Reservation:
+    type: Reservation
+    actions:
+      - collect
+    properties:
+      - ClientId
+      - Description
+      - IPAddress
+      - Name
+      - Type
