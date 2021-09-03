@@ -10,7 +10,7 @@
 
  Author: Chris Marrison
 
- Date Last Updated: 20210824
+ Date Last Updated: 20210903
 
  Copyright (c) 2021 Chris Marrison / John Neerdael / Infoblox
  Redistribution and use in source and binary forms,
@@ -35,7 +35,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.8.5'
+__version__ = '0.8.6'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
@@ -62,7 +62,7 @@ def parseargs():
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
-    parser.add_argument('-y', '--yaml', type=str, help="Alternate yaml config file for objects", default='objects.yaml')
+    parser.add_argument('-y', '--yaml', type=str, help="Alternate yaml config file for objects", default='')
     parser.add_argument('-r', '--ryaml', type=str, help="Alternate report yaml config file for objects", default='report_config.yaml')
     parser.add_argument('--debug', help="Enable debug logging", action="store_const", dest="loglevel", const=logging.DEBUG, default=logging.INFO)
 
@@ -671,7 +671,9 @@ def main():
        v = report_versions(objyaml)
        pprint.pprint(v)
     elif options.type == 'NIOS':
-       process_backup(database, outfile, 
+        if not objyaml:
+            objyaml = 'objects.yaml'
+        process_backup(database, outfile, 
                       output_path = output_path,
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
@@ -681,7 +683,9 @@ def main():
                       logfile=logfile,
                       objyaml=objyaml)
     elif options.type == 'MS-DHCP':
-       process_ms(database, outfile, 
+        if not objyaml:
+            objyaml = 'ms-dhcp-objects.yaml'
+        process_ms(database, outfile, 
                       output_path = output_path,
                       silent_mode=options.silent, 
                       dump_obj=options.dump,
