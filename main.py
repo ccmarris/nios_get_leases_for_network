@@ -35,11 +35,12 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.8.1'
+__version__ = '0.8.5'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com'
 
 import dblib
+import msdhcplib
 import argparse, tarfile, logging, time, sys, tqdm
 import os
 import collections
@@ -52,11 +53,12 @@ def parseargs():
     # Parse arguments
     parser = argparse.ArgumentParser(description='Validate NIOS database backup for B1DDI compatibility')
     parser.add_argument('-d', '--database', action="store", help="Path to database file", default='database.bak')
+    parser.add_argument('-t', '--type', type=str, help="DB Type", default='NIOS')
     parser.add_argument('-c', '--customer', action="store", help="Customer name (optional)")
     parser.add_argument('-p', '--output_path', type=str, default='', help="Output file path (optional)")
     parser.add_argument('--dump', type=str, default='', help="Dump Object")
-    parser.add_argument('--dump_all', action='store_true', help="Dump All Objects")
-    parser.add_argument('--list_objects', action='store_true', help="Dump All Objects")
+    parser.add_argument('--dump_all', action='store_true', help="Dump all objects specified by --dump")
+    parser.add_argument('--list_objects', action='store_true', help="Dump All Objects Type")
     parser.add_argument('--key_value', nargs=2, type=str, default='', help="Key/value pair to match on dump")
     parser.add_argument('--silent', action='store_true', help="Silent Mode")
     parser.add_argument('-v', '--version', action='store_true', help="Silent Mode")
@@ -174,6 +176,113 @@ def process_onedb(xmlfile, iterations, silent_mode=False, objyaml=''):
                         
                 except:
                     raise
+                pbar.update(1)
+            elem.clear()
+
+        '''
+        # Log lease info
+        for key in node_lease_count:
+            logging.info('LEASECOUNT,{},{}'.format(key, node_lease_count[key]))
+        '''
+
+    return report
+
+
+def process_ms_dhcp(xmlfile, iterations, silent_mode=False, objyaml=''):
+    '''
+    Process onedb.xml
+    '''
+    # parser = etree.XMLPullParser(target=AttributeFilter())
+    report = {}
+    object_counts = collections.Counter()
+    member_counts = collections.Counter()
+    enabled_features = collections.defaultdict(bool)
+
+    report['processed'] = collections.defaultdict(list)
+    report['collected'] = collections.defaultdict(list)
+    report['counters'] = object_counts
+    report['features'] = enabled_features
+    report['member_counts'] = collections.defaultdict()
+    report['activeip'] = collections.defaultdict()
+    # node_lease_count = collections.Counter()
+
+    OBJECTS = dblib.DBCONFIG(objyaml)
+    with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
+        count = 0
+        #xmlfile.seek(0)
+        # context = etree.iterparse(xmlfile, events=('end',))
+        context = etree.iterparse(xmlfile, events=('start','end'))
+        for event, elem in context:
+            count += 1
+            try:
+                obj_value = msdhcplib.get_object_value(elem)
+                obj_type = OBJECTS.obj_type(obj_value)
+                if OBJECTS.included(obj_value):
+                    logging.debug('Processing object {}'.format(obj_value))
+                    logging.debug(msdhcplib.simple_element_output(elem))
+                    for action in OBJECTS.actions(obj_value):
+                        # Action Count
+                        if action == 'count':
+                            # Use friendly object name
+                            object_counts[obj_type] += 1
+
+                        # Action Feature Enabled
+                        elif action == 'feature':
+                            feature = OBJECTS.feature(obj_value)
+                            keypair = OBJECTS.keypair(obj_value)
+                            if not enabled_features[feature]:
+                                if keypair and len(keypair) == 2:
+                                    # Assume valid keypair
+                                    enabled_features[feature] = msdhcplib.check_feature(elem,
+                                                                                    key_name=keypair[0],
+                                                                                    expected_value=keypair[1])
+                                else:
+                                    # Try default check
+                                    enabled_features[feature] = msdhcplib.check_feature(elem)
+                            else:
+                                # Feature has already been found
+                                None
+
+                        # Action Process
+                        elif action == 'process':
+                            process_object = getattr(msdhcplib, OBJECTS.func(obj_value))
+                            # onsider using a pandas dataframe
+                            response = process_object(elem, count)
+                            if response:
+                                report['processed'][obj_value].append(response)
+
+                        # Action Collect 
+                        elif action == 'collect':
+                            collect_properties = OBJECTS.properties(obj_value)
+                            response = msdhcplib.process_object(elem, collect_properties)
+                            if response:
+                                report['collected'][obj_value].append(response)
+
+                        # Action Member Count
+                        elif action == 'member':
+                            process_object = getattr(msdhcplib, OBJECTS.func(obj_value))
+                            if obj_type not in report['member_counts'].keys():
+                                report['member_counts'][obj_type] = collections.Counter()
+                            member = process_object(elem)
+                            if member:
+                                report['member_counts'][obj_type][member] += 1
+                        
+                        # Action Active IP Estimate
+                        elif action == 'activeip':
+                            if obj_value not in report['activeip'].keys():
+                                report['activeip'][obj_value] = set()
+                            report['activeip'][obj_value].add(msdhcplib.process_activeip(elem))
+                                
+                        # Action Not Implemented
+                        else:
+                            logging.warning('Action: {} not implemented'.format(action))
+                            None
+                else:
+                    logging.debug('Object: {} not defined'.format(obj_value))
+                
+                    
+            except:
+                raise
                 pbar.update(1)
             elem.clear()
 
@@ -331,6 +440,49 @@ def process_backup(database,
     return status
 
 
+def process_ms(database, 
+                outfile, 
+                output_path=None,
+                silent_mode=False, 
+                dump_obj=None,
+                dump_all=False,
+                list_objs=False,
+                key_value=None,
+                logfile='',
+                objyaml=''):
+    '''
+    Determine whether backup File or XML
+
+    Parameters:
+        database (str): Filename
+        outfile (str): postfix for output files
+        output_path (str): Path for file output
+        silent_mode (bool): Do not log to console
+        dump_obj(str): Dump object from database
+        dump_all(bool): Dump all specified objects
+        list_objs(bool): List all object types
+        key_value(list): Key Value Pair to match using dump 
+        objyaml (str): Object config yaml file
+    '''
+    status = False
+    t = time.perf_counter()
+
+    # Assume MS-DHCP XML File
+    with open(database, 'rb') as xmlfile:
+        status = process_ms_file(xmlfile, 
+                                outfile,
+                                output_path=output_path,
+                                silent_mode=silent_mode, 
+                                dump_obj=dump_obj,
+                                dump_all=dump_all,
+                                list_objs=list_objs,
+                                key_value=key_value,
+                                logfile=logfile,
+                                objyaml=objyaml)
+
+    return status
+
+
 def process_file(xmlfile, outfile, 
                  output_path=None,
                  silent_mode=False, 
@@ -396,6 +548,70 @@ def process_file(xmlfile, outfile,
     return status
 
 
+def process_ms_file(xmlfile, outfile, 
+                 output_path=None,
+                 silent_mode=False, 
+                 dump_obj=None,
+                 dump_all=False,
+                 list_objs=False,
+                 key_value=None,
+                 logfile='',
+                 t=time.perf_counter(),
+                 objyaml=''):
+    '''
+    Process file
+
+    Parameters:
+        database (str): input file name
+        outfile (str): postfix for output files
+        output_path (str): Path for file output
+        silent_mode (bool): Do not log to console
+        dump_obj(str): Dump object from database
+        dump_all(bool): Dump all specified objects
+        list_objs(bool): List all object types
+        logfile (str): Logging filename
+        t (obj): time.perfcounter object
+        objyaml (str): Object config yaml file
+    
+    Returns:
+        True or False 
+    '''
+    status = False
+
+    if not dump_obj and not list_objs:
+        t2 = time.perf_counter() - t
+        iterations = msdhcplib.rawincount(xmlfile)
+        xmlfile.seek(0)
+        t3 = time.perf_counter() - t2
+
+        logging.info(f'COUNTED {iterations} Elements IN {t3:0.2f}S')
+
+        # searchrootobjects(xmlfile, iterations)
+        db_report = process_ms_dhcp(xmlfile, iterations, silent_mode=silent_mode, objyaml=objyaml)
+        output_reports(db_report, outfile, output_path=output_path, objyaml=objyaml)
+
+        t4 = time.perf_counter() - t
+        logging.info(f'FINISHED PROCESSING IN {t4:0.2f}S, LOGFILE: {logfile}')
+        status = True
+
+    if dump_obj:
+        if key_value:
+            if msdhcplib.dump_object(dump_obj, 
+                                 xmlfile, 
+                                 all=dump_all,
+                                 property=key_value[0], 
+                                 value=key_value[1]):
+                status = True
+        else:
+            if msdhcplib.dump_object(dump_obj, xmlfile, all=dump_all):
+                status = True
+    
+    if list_objs:
+        if msdhcplib.list_object_types(xmlfile):
+            status = True
+
+    return status
+
 def main():
     '''
     Core logic
@@ -454,7 +670,7 @@ def main():
     if options.version:
        v = report_versions(objyaml)
        pprint.pprint(v)
-    else:
+    elif options.type == 'NIOS':
        process_backup(database, outfile, 
                       output_path = output_path,
                       silent_mode=options.silent, 
@@ -464,6 +680,19 @@ def main():
                       key_value=options.key_value,
                       logfile=logfile,
                       objyaml=objyaml)
+    elif options.type == 'MS-DHCP':
+       process_ms(database, outfile, 
+                      output_path = output_path,
+                      silent_mode=options.silent, 
+                      dump_obj=options.dump,
+                      dump_all=options.dump_all,
+                      list_objs=options.list_objects,
+                      key_value=options.key_value,
+                      logfile=logfile,
+                      objyaml=objyaml)
+    else:
+        logging.error(f'Database type {options.type} not supported')
+        exitcode = 1
 
     return exitcode
 
