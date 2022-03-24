@@ -36,7 +36,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 ------------------------------------------------------------------------
 '''
-__version__ = '0.8.1'
+__version__ = '0.8.2'
 __author__ = 'Chris Marrison, John Neerdael'
 __author_email__ = 'chris@infoblox.com, jneerdael@infoblox.com'
 
@@ -624,8 +624,13 @@ def validatedhcpoption(type, parentobj, optionspace, optioncode, hexvalue, optio
 
     r = []
 
+    # Check for incompatible
     if optioncode in incompatible_options:
         r = [ 'DHCPOPTION', 'CHECK_GUARDRAILS', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
+    # Check for length of value
+    elif len(optionvalue) > 255:
+        r = [ 'DHCPOPTION', 'CHECK_OPTION_LENGTH', type, parentobj, optionspace, str(optioncode), optionvalue, str(count) ]
+    # Check for additional validation
     elif optioncode in validate_options:
         if optioncode == 43:
             if hexvalue == True:

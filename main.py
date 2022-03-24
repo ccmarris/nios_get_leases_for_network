@@ -104,7 +104,8 @@ def process_onedb(xmlfile, iterations, silent_mode=False, objyaml=''):
     with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
         count = 0
         #xmlfile.seek(0)
-        context = etree.iterparse(xmlfile, events=('end',), tag='OBJECT')
+        context = etree.iterparse(xmlfile, events=('end',), tag='OBJECT', 
+                                  recover=True)
         for event, elem in context:
             if event == 'end':
                 count += 1
@@ -209,9 +210,10 @@ def process_ms_dhcp(xmlfile, iterations, silent_mode=False, objyaml=''):
     OBJECTS = dblib.DBCONFIG(objyaml)
     with tqdm.tqdm(total=iterations, disable=silent_mode) as pbar:
         count = 0
-        #xmlfile.seek(0)
-        # context = etree.iterparse(xmlfile, events=('end',))
-        context = etree.iterparse(xmlfile, events=('start','end'))
+        context = etree.iterparse(xmlfile, 
+                                  events=('start','end'), 
+                                  encoding='UTF-8',
+                                  recover=True)
         for event, elem in context:
             count += 1
             try:
