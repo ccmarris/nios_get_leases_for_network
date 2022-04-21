@@ -4,14 +4,15 @@
 
  Description:
 
-    Retrieve leases for a network based on a seed IP address
+    NIOS WAPI Benchmark Script
+    Uses threading with multiple sessions
 
  Requirements:
    Python 3.6+
 
  Author: Chris Marrison
 
- Date Last Updated: 20220420
+ Date Last Updated: 20220415
 
  Todo:
 
@@ -42,13 +43,12 @@
  POSSIBILITY OF SUCH DAMAGE.
 
 '''
-__version__ = '0.2.0'
+__version__ = '0.1.0'
 __author__ = 'Chris Marrison'
 __author_email__ = 'chris@infoblox.com'
 __license__ = 'BSD'
 
 import logging
-from multiprocessing.dummy import active_children
 from rich import print
 import requests
 import argparse
@@ -71,12 +71,14 @@ def parseargs():
     parse = argparse.ArgumentParser(description=description)
     parse.add_argument('-c', '--config', type=str, default='gm.ini',
                         help="Override ini file")
-    parse.add_argument('-i', '--ip4addr', type=str, required=True,
+    parse.add_argument('-n', '--network', type=str, required=True,
                         help="Specify network to get IP information")
     parse.add_argument('-v', '--view', type=str, default="default",
                         help="Specify the network view")
-    parse.add_argument('-a', '--active_only', action='store_true',
-                        help="Show active leases only")
+    parse.add_argument('-t', '--threads', type=int, default=5,
+                        help="Number of Threads")
+    parse.add_argument('-s', '--sessions', type=int, default=1,
+                        help="Number of HTTP Session to create")
     parse.add_argument('-d', '--debug', action='store_true', 
                         help="Enable debug messages")
 
@@ -197,7 +199,22 @@ i   Returns:
     return data
 
 
-def get_network_leases(config, ipaddr, net_view="default"):
+def make_wapi_calls(sessions, url):
+    '''
+    '''
+    results = {}
+
+    for z in range(0, (len(sessions)-1)):
+        results.append(wapi_call(sessions[z], url=url))
+
+    return results
+
+
+def get_network_leases(config, 
+                       network, 
+                       net_view="default", 
+                       threads=5, 
+                       no_of_sessions=1):
     '''
     Get the active leases for a network
 
@@ -205,67 +222,94 @@ def get_network_leases(config, ipaddr, net_view="default"):
         config (dict): config from inifile
         network (str): network address
         net_view (str): network view
+        threads (int): number of threads to execute
+        no_of_sessions (int): number of http sessions used by threads
 
     Returns:
-        List of leases objects
+        runt_time (time): execution time
     '''
+    run_time = 0
+    results = []
     lease_objects = []
+    sessions = []
+    tasks = []
     base_url = f'https://{config.get("gm")}/wapi/{config.get("api_version")}'
-    net_fields = '_return_fields=ip_address,network,network_view,status,types'
-    lease_fields = ( '_return_fields=address,network,network_view,' +
-                     'binding_state,hardware,cltt,ends,served_by,' +
-                     'client_hostname' )
+    lease_fields = ( '_return_fields=address,binding_state,hardware,' +
+                     'cltt,ends,served_by,client_hostname' )
 
-    session = create_session(config)
+    # Create one or more HTTP sessions, this may improve performance
+    if no_of_sessions > 10:
+        # Reset to max recommended
+        no_of_sessions = 10
+
+    for i in range(0, (no_of_sessions)):
+        sessions.append(create_session(config))
 
     # Get network with IPs
-    url = ( f'{base_url}/ipv4address?ip_address={ipaddr}' +
-            f'&network_view={net_view}&{net_fields}&_max_results=1' )
+    url = f'{base_url}/ipv4address?network={network}&network_view={net_view}'
     # Use base session
-    logging.info(f'Retrieving network for IP: {ipaddr}')
-    net_data = wapi_call(session, url=url)
+    logging.info(f'Retrieving network: {network}')
+    net_data = wapi_call(sessions[0], url=url)
     if net_data:
         logging.info('Network retrieved successfully')
-        logging.debug(f'Response: {net_data}')
-        network = net_data[0].get('network')
-        logging.debug(f'Network: {network}')
+        lease_objects = process_network(net_data)
     else:
         logging.error('Failed to retrieve network')
-        network = []
-    
-    # Get lease objects
-    if network:
-        logging.info(f'Retrieving leases')
-        url = f'{base_url}/lease?network={network}&{lease_fields}'
-        lease_objects = wapi_call(session, url=url)
-    else:
         lease_objects = []
     
-    return lease_objects
+    # Get lease objects
+    logging.info(f'Retrieving {len(lease_objects)} leases')
+    if lease_objects:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=threads) as executor:
+            index = 0
+            max_index = len(lease_objects) - 1
+            while index <= max_index:
+                for i in range(0, (no_of_sessions)):
+                    url = f'{base_url}/{lease_objects[index]}?{lease_fields}'
+                    logging.debug(f'Lease URL: {url}')
+                    tasks.append(executor.submit(wapi_call, 
+                                                 session=sessions[i], 
+                                                 url=url))
+                    index += 1
+                    if index > max_index:
+                        break
+    
+        # results = process_tasks(tasks)
+        for task in concurrent.futures.as_completed(tasks):
+            results.append(task.result())
+    else:
+        results = []
+    
+    return results
 
 
-def process_network(lease_objects):
+def process_network(net_data):
     '''
-    Generate the set of active leases
+    Generate the set of lease objects from the network
 
     Parameters:
-        lease_objects (list): list of dict of lease objects
+        net_data (dict): Dict from json data
     
     Returns:
-        List of active leases
 
     '''
-    active_leases = []
+    lease_objects = []
 
-    logging.info('Processing leases for network')
-    for lease in lease_objects:
-        if lease.get('binding_state') == "ACTIVE":
-            active_leases.append(lease)
-
-    logging.debug(f'Active Leases: {active_leases}')
+    logging.info('Processing network')
+    for element in net_data:
+        if element.get('status') == "USED":
+            if element.get('usage'):
+                if "DHCP" in element.get('usage'):
+                    # Gather lease objects
+                    if element.get('objects'):
+                        for obj in element.get('objects'):
+                            if 'lease' in obj:
+                                logging.debug(f'Lease object found for: element.get("ip_address")')
+                                lease_objects.append(obj)
+                                break
+    logging.debug(f'Lease Objects: {lease_objects}§')
     
-    return active_leases
-
+    return lease_objects
 
 '''
     url = mainurl+"lease?address="+ip+"&_return_fields=binding_state,hardware,client_hostname,starts,ends&_max_results=1&_return_as_object=1"
@@ -286,8 +330,7 @@ def main():
     '''
     exitcode = 0
     run_time = 0
-    network_leases = []
-    active_leases = []
+    network_leases = {}
 
     # Parse CLI arguments
     args = parseargs()
@@ -298,23 +341,13 @@ def main():
 
     t1 = time.perf_counter()
     network_leases = get_network_leases(config, 
-                                        args.ip4addr, 
-                                        net_view=args.view)
-
-    # Active Only
-    if network_leases and args.active_only:
-        active_leases = process_network(network_leases)
-        print(active_leases)
-
+                                        args.network, 
+                                        net_view=args.view,
+                                        threads=args.threads)
     run_time = time.perf_counter() - t1
     
-    if active_leases:
-        print(active_leases)
-        print(f'{len(active_leases)} active leases retrieved')
-    else:
-        print(network_leases)
-        print(f'{len(network_leases)} leases retrieved')
-
+    print(network_leases)
+    print(f'{len(network_leases)} leases retrieved')
     print('Run time: {}'.format(run_time))
 
     return exitcode
